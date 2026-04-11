@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workshop ETL 2 | Spotify + Grammys</title>
+  <style>
+    :root {
+      --bg: #f5f0e7;
+      --surface: rgba(255, 253, 248, 0.92);
+      --surface-strong: #fffdf8;
+      --surface-soft: #f8efe1;
+      --text: #17212b;
+      --muted: #5b6772;
+      --navy: #17324d;
+      --teal: #2a9d8f;
+      --orange: #ba4a00;
+      --gold: #c08a1a;
+      --border: rgba(23, 50, 77, 0.10);
+      --shadow: 0 24px 60px rgba(23, 33, 43, 0.10);
+      --radius-xl: 30px;
+      --radius-lg: 24px;
+      --radius-md: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Avenir Next", "Segoe UI", Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(42, 157, 143, 0.12), transparent 24%),
+        radial-gradient(circle at top right, rgba(186, 74, 0, 0.14), transparent 26%),
+        linear-gradient(180deg, #fbf7f0 0%, var(--bg) 100%);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(16px);
+      background: rgba(251, 247, 240, 0.78);
+      border-bottom: 1px solid rgba(23, 50, 77, 0.08);
+    }
+
+    .topbar-inner {
+      width: min(1220px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 14px 0;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--navy);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .nav a,
+    .button-link {
+      text-decoration: none;
+      color: var(--navy);
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(23, 50, 77, 0.08);
+      border-radius: 999px;
+      padding: 9px 14px;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .button-link.primary {
+      background: var(--navy);
+      color: white;
+      border-color: var(--navy);
+    }
+
+    .deck {
+      width: min(1220px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 24px 0 72px;
+    }
+
+    .slide {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      padding: 34px;
+      margin-top: 24px;
+    }
+
+    .hero {
+      padding: 42px 38px;
+      overflow: hidden;
+      position: relative;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(42, 157, 143, 0.14), transparent 28%),
+        radial-gradient(circle at 85% 18%, rgba(186, 74, 0, 0.16), transparent 26%),
+        linear-gradient(135deg, rgba(255, 253, 248, 0.96), rgba(255, 247, 235, 0.92));
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(23, 50, 77, 0.06);
+      color: var(--navy);
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      line-height: 0.96;
+      max-width: 10ch;
+      color: var(--navy);
+    }
+
+    h2 {
+      font-size: clamp(1.5rem, 2.5vw, 2.2rem);
+      margin-bottom: 10px;
+      color: var(--navy);
+    }
+
+    h3 {
+      font-size: 1rem;
+      color: var(--navy);
+    }
+
+    h4 {
+      font-size: 0.9rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    p {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    code {
+      display: inline-block;
+      padding: 0.18rem 0.48rem;
+      border-radius: 10px;
+      background: rgba(23, 50, 77, 0.08);
+      border: 1px solid rgba(23, 50, 77, 0.10);
+      color: var(--orange);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+      font-weight: 800;
+    }
+
+    .hero-grid,
+    .two-col,
+    .three-col,
+    .four-col {
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero-grid,
+    .two-col {
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    .three-col {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .four-col {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .hero-copy {
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .hero-actions,
+    .pill-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 9px 13px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      background: rgba(23, 50, 77, 0.06);
+      color: var(--navy);
+    }
+
+    .pill.teal {
+      background: rgba(42, 157, 143, 0.14);
+      color: #17675e;
+    }
+
+    .pill.orange {
+      background: rgba(186, 74, 0, 0.12);
+      color: #8d3600;
+    }
+
+    .pill.gold {
+      background: rgba(192, 138, 26, 0.14);
+      color: #8f6914;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      align-content: start;
+    }
+
+    .metric-card,
+    .mini-card,
+    .story-card,
+    .insight-card,
+    .diagram-card,
+    .answer-card {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+    }
+
+    .metric-card {
+      padding: 18px;
+    }
+
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--navy);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .metric-label {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .metric-caption {
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+      flex-wrap: wrap;
+    }
+
+    .section-sub {
+      max-width: 720px;
+    }
+
+    .story-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .story-card,
+    .answer-card,
+    .mini-card,
+    .diagram-card {
+      padding: 20px;
+    }
+
+    .story-card strong,
+    .answer-card strong,
+    .mini-card strong,
+    .diagram-card strong {
+      display: block;
+      font-size: 1.35rem;
+      line-height: 1.05;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+
+    .story-card p,
+    .answer-card p,
+    .mini-card p,
+    .diagram-card p {
+      font-size: 0.92rem;
+    }
+
+    .check-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .check-item {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .check-item .state {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: rgba(42, 157, 143, 0.16);
+      color: #17675e;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+
+    .source-grid,
+    .decision-grid,
+    .answer-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 16px;
+    }
+
+    .source-card,
+    .decision-card {
+      background: linear-gradient(180deg, #fffdf8, #faf4eb);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .source-card strong,
+    .decision-card strong {
+      display: block;
+      font-size: 1.25rem;
+      color: var(--navy);
+      margin-bottom: 12px;
+    }
+
+    .source-card ul,
+    .decision-card ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .field-list {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 12px 0 0;
+    }
+
+    .field-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 11px;
+      border-radius: 999px;
+      background: rgba(42, 157, 143, 0.12);
+      border: 1px solid rgba(42, 157, 143, 0.18);
+      color: #17675e;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+    }
+
+    .process-line {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+    }
+
+    .step-card {
+      background: linear-gradient(180deg, #fffdf8, #f8efe1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+
+    .step-index {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      margin-bottom: 12px;
+      background: var(--navy);
+      color: white;
+    }
+
+    .formula {
+      background: #16202b;
+      color: #f4f7fb;
+      border-radius: 22px;
+      padding: 22px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.98rem;
+      overflow-x: auto;
+      box-shadow: var(--shadow);
+    }
+
+    .dag-board {
+      margin-top: 18px;
+      background: linear-gradient(180deg, #fffdf8 0%, #faf4eb 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 24px;
+      overflow-x: auto;
+      box-shadow: var(--shadow);
+    }
+
+    .dag-canvas {
+      position: relative;
+      min-width: 1230px;
+      height: 350px;
+    }
+
+    .dag-lines {
+      position: absolute;
+      inset: 0;
+      width: 1230px;
+      height: 350px;
+      pointer-events: none;
+    }
+
+    .dag-source,
+    .dag-node {
+      position: absolute;
+      box-shadow: var(--shadow);
+    }
+
+    .dag-source {
+      width: 88px;
+      min-height: 88px;
+      border-radius: 22px;
+      border: 1px solid rgba(23, 50, 77, 0.10);
+      background: rgba(255, 255, 255, 0.96);
+      display: grid;
+      place-items: center;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .dag-source strong {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--navy);
+      line-height: 1.15;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .dag-source span {
+      display: block;
+      margin-top: 6px;
+      font-size: 0.74rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .dag-source.db { left: 8px; top: 26px; }
+    .dag-source.csv { left: 8px; top: 190px; }
+
+    .dag-node {
+      width: 190px;
+      border-radius: 20px;
+      border: 1px solid rgba(23, 50, 77, 0.10);
+      background: rgba(255, 255, 255, 0.98);
+      overflow: hidden;
+    }
+
+    .dag-node.bootstrap { left: 118px; top: 16px; }
+    .dag-node.grammy { left: 352px; top: 16px; }
+    .dag-node.spotify { left: 118px; top: 180px; }
+    .dag-node.clean { left: 610px; top: 98px; }
+    .dag-node.transform { left: 844px; top: 98px; }
+    .dag-node.export { left: 1078px; top: 16px; }
+    .dag-node.load { left: 1078px; top: 180px; }
+
+    .dag-node-head {
+      background: linear-gradient(180deg, #264653 0%, #1f3b4b 100%);
+      color: white;
+      padding: 14px 16px;
+    }
+
+    .dag-node-head strong {
+      display: block;
+      font-size: 0.94rem;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+    }
+
+    .dag-node-body {
+      padding: 14px 16px 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .dag-node-body p {
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
+    .operator-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(42, 157, 143, 0.12);
+      border: 1px solid rgba(42, 157, 143, 0.18);
+      color: #17675e;
+      font-size: 0.74rem;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .dag-note {
+      margin-top: 14px;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .bar-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      gap: 8px;
+    }
+
+    .bar-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 11px;
+      background: rgba(23, 50, 77, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--teal), var(--navy));
+    }
+
+    .bar-fill.orange {
+      background: linear-gradient(90deg, var(--orange), var(--gold));
+    }
+
+    .bar-fill.navy {
+      background: linear-gradient(90deg, #264653, var(--navy));
+    }
+
+    .insight-compare {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .compare-card {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .compare-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .compare-head strong {
+      font-size: 1.45rem;
+      color: var(--navy);
+    }
+
+    .compare-split {
+      display: grid;
+      gap: 12px;
+    }
+
+    .split-card {
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      background: rgba(23, 50, 77, 0.05);
+    }
+
+    .split-card .label {
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .split-card .value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--navy);
+    }
+
+    .schema-board {
+      margin-top: 22px;
+      background: linear-gradient(180deg, #fffdf8 0%, #fbf6ee 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 30px 22px;
+      overflow-x: auto;
+      box-shadow: var(--shadow);
+    }
+
+    .schema-star {
+      position: relative;
+      min-width: 980px;
+      min-height: 660px;
+    }
+
+    .schema-lines {
+      position: absolute;
+      inset: 0;
+      width: 980px;
+      height: 660px;
+      pointer-events: none;
+    }
+
+    .schema-table {
+      position: absolute;
+      width: 248px;
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 0 0 20px 20px;
+      overflow: hidden;
+      border: 1px solid rgba(23, 50, 77, 0.06);
+      box-shadow: 0 20px 40px rgba(23, 33, 43, 0.08);
+    }
+
+    .schema-table.fact {
+      width: 252px;
+    }
+
+    .schema-table.dim-track { left: 16px; top: 38px; }
+    .schema-table.dim-award { right: 16px; top: 38px; }
+    .schema-table.dim-artist { left: 16px; bottom: 36px; }
+    .schema-table.dim-genre { right: 16px; bottom: 36px; }
+    .schema-table.fact { left: 364px; top: 214px; }
+
+    .schema-head {
+      background: linear-gradient(180deg, #254354 0%, #1f3b4b 100%);
+      color: white;
+      padding: 16px 18px;
+      text-align: center;
+      font-size: 1.02rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .schema-body {
+      display: grid;
+    }
+
+    .schema-row {
+      padding: 12px 18px;
+      font-size: 0.98rem;
+      color: #2d3a45;
+      border-top: 1px solid rgba(23, 50, 77, 0.04);
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .schema-row:nth-child(odd) {
+      background: rgba(23, 50, 77, 0.04);
+    }
+
+    .schema-row.key {
+      font-weight: 900;
+      color: var(--navy);
+    }
+
+    .schema-badge {
+      position: absolute;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(23, 50, 77, 0.10);
+      color: var(--orange);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.78rem;
+      font-weight: 900;
+      box-shadow: var(--shadow);
+      z-index: 2;
+    }
+
+    .schema-badge.track { left: 270px; top: 166px; }
+    .schema-badge.award { left: 678px; top: 166px; }
+    .schema-badge.artist { left: 268px; top: 483px; }
+    .schema-badge.genre { left: 680px; top: 483px; }
+
+    .dashboard-wrap {
+      background: linear-gradient(180deg, #fffdf8, #f8efe1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .dashboard-toolbar {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(23, 50, 77, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: rgba(23, 50, 77, 0.04);
+    }
+
+    .dashboard-toolbar p {
+      font-size: 0.9rem;
+    }
+
+    iframe {
+      display: block;
+      width: 100%;
+      height: 920px;
+      border: 0;
+      background: white;
+    }
+
+    .footer {
+      padding: 24px 0 8px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 900px) {
+      .slide {
+        padding: 24px;
+      }
+
+      .hero {
+        padding: 28px 24px;
+      }
+
+      iframe {
+        height: 760px;
+      }
+
+      .dag-canvas {
+        min-width: 100%;
+        height: auto;
+        display: grid;
+        gap: 14px;
+      }
+
+      .dag-lines {
+        display: none;
+      }
+
+      .dag-source,
+      .dag-node,
+      .dag-source.db,
+      .dag-source.csv,
+      .dag-node.bootstrap,
+      .dag-node.grammy,
+      .dag-node.spotify,
+      .dag-node.clean,
+      .dag-node.transform,
+      .dag-node.export,
+      .dag-node.load {
+        position: static;
+        width: 100%;
+      }
+
+      .schema-star {
+        min-width: 100%;
+        min-height: auto;
+        display: grid;
+        gap: 16px;
+      }
+
+      .schema-lines,
+      .schema-badge {
+        display: none;
+      }
+
+      .schema-table,
+      .schema-table.fact,
+      .schema-table.dim-track,
+      .schema-table.dim-award,
+      .schema-table.dim-artist,
+      .schema-table.dim-genre {
+        position: static;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">Spotify + Grammys ETL</div>
+      <nav class="nav">
+        <a href="#preguntas">Preguntas</a>
+        <a href="#eda">EDA</a>
+        <a href="#airflow">Airflow</a>
+        <a href="#transformacion">Transformación</a>
+        <a href="#modelo">Star schema</a>
+        <a href="#insights">Insights</a>
+        <a href="#dashboard">Dashboard</a>
+      </nav>
+    </div>
+  </div>
+
+  <main class="deck">
+    <section class="slide hero" id="inicio">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">Workshop ETL 2</div>
+          <h1>De los CSV al dashboard analítico</h1>
+          <p>
+            En esta presentación muestro mi proceso completo: setup, EDA, profiling, extracción con Airflow,
+            cleaning, merge, Data Warehouse y visualización final.
+          </p>
+          <div class="pill-row">
+            <span class="pill">Apache Airflow</span>
+            <span class="pill teal">SQLite Source DB</span>
+            <span class="pill orange">Star Schema</span>
+            <span class="pill gold">Streamlit Dashboard</span>
+          </div>
+          <div class="hero-actions">
+            <a class="button-link primary" href="#dashboard">Ver dashboard</a>
+            <a class="button-link" href="#modelo">Ver modelo dimensional</a>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card">
+            <div class="metric-value">114,000</div>
+            <div class="metric-label">Filas Spotify raw</div>
+            <div class="metric-caption">Fuente CSV leída por Airflow con Python operators.</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-value">4,810</div>
+            <div class="metric-label">Filas Grammys raw</div>
+            <div class="metric-caption">Cargadas primero a base de datos y luego extraídas por Airflow.</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-value">89,740</div>
+            <div class="metric-label">Tracks en el DW</div>
+            <div class="metric-caption">Después del cleaning y consolidación por <code>track_id</code>.</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-value">261</div>
+            <div class="metric-label">Matches exactos</div>
+            <div class="metric-caption">Cruce determinístico track + artista entre Spotify y Grammys.</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-value">5,661</div>
+            <div class="metric-label">Artist-only matches</div>
+            <div class="metric-caption">Enriquecimiento por historial Grammy cuando no hubo match exacto.</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-value">720</div>
+            <div class="metric-label">Conflictos de popularidad</div>
+            <div class="metric-caption">Preservados para trazabilidad, no ocultados en cleaning.</div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="preguntas">
+      <div class="section-head">
+        <div class="section-sub">
+          <h2>Preguntas que guiaron el proyecto</h2>
+          <p>No empecé por el pipeline; empecé por lo que quería poder responder al final.</p>
+        </div>
+        <div class="pill-row">
+          <span class="pill teal">Analytics-first</span>
+          <span class="pill orange">Evidence-driven</span>
+        </div>
+      </div>
+
+      <div class="story-grid">
+        <article class="story-card">
+          <strong>1. ¿La popularidad importa?</strong>
+          <p>Quise contrastar si los tracks con historial Grammy muestran una popularidad promedio mayor en Spotify.</p>
+        </article>
+        <article class="story-card">
+          <strong>2. ¿Hay un perfil sonoro?</strong>
+          <p>Busqué diferencias en <code>danceability</code>, <code>energy</code> e <code>instrumentalness</code>.</p>
+        </article>
+        <article class="story-card">
+          <strong>3. ¿Qué artistas destacan?</strong>
+          <p>Quise identificar artistas con más wins Grammy visibles en el cruce con Spotify y su contexto de popularidad.</p>
+        </article>
+        <article class="story-card">
+          <strong>4. ¿Qué géneros aparecen más?</strong>
+          <p>Conservar todos los géneros me permitía analizar conexiones entre tipo de track y match Grammy.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="slide" id="eda">
+      <div class="section-head">
+        <div class="section-sub">
+          <h2>EDA y data profiling</h2>
+          <p>Primero hice profiling para entender estructura, calidad, viabilidad del merge y riesgos de modelado.</p>
+        </div>
+        <div class="pill-row">
+          <span class="pill">Tipos</span>
+          <span class="pill">Missing</span>
+          <span class="pill">Duplicates</span>
+          <span class="pill">Outliers</span>
+          <span class="pill">Plots</span>
+        </div>
+      </div>
+
+      <div class="source-grid">
+        <article class="source-card">
+          <strong>Spotify</strong>
+          <ul>
+            <li>CSV con 114,000 filas.</li>
+            <li>Campos que más usé para integración y análisis.</li>
+            <li>Atributos de audio disponibles para análisis posterior.</li>
+          </ul>
+          <div class="field-list">
+            <span class="field-chip">track_id</span>
+            <span class="field-chip">track_name</span>
+            <span class="field-chip">artists</span>
+            <span class="field-chip">track_genre</span>
+            <span class="field-chip">popularity</span>
+          </div>
+        </article>
+        <article class="source-card">
+          <strong>Grammys</strong>
+          <ul>
+            <li>CSV cargado primero a SQLite.</li>
+            <li>Campos que definieron el cruce con Spotify.</li>
+            <li>638 categorías distintas observadas.</li>
+          </ul>
+          <div class="field-list">
+            <span class="field-chip">artist</span>
+            <span class="field-chip">nominee</span>
+            <span class="field-chip">category</span>
+            <span class="field-chip">year</span>
+            <span class="field-chip">winner</span>
+          </div>
+        </article>
+        <article class="source-card">
+          <strong>Notebook de evidencia</strong>
+          <ul>
+            <li><code>head()</code>, <code>info()</code>, <code>describe()</code>.</li>
+            <li>Tablas de missing values y duplicates.</li>
+            <li>Revisión de outliers con IQR.</li>
+            <li>Gráficas de distribución y top categorías/géneros.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="four-col" style="margin-top: 18px;">
+        <article class="mini-card">
+          <strong>16,641</strong>
+          <p>grupos duplicados de <code>track_id</code>.</p>
+        </article>
+        <article class="mini-card">
+          <strong>16,299</strong>
+          <p>eran la misma canción repetida por múltiples géneros.</p>
+        </article>
+        <article class="mini-card">
+          <strong>1,840</strong>
+          <p>filas Grammy con artista vacío.</p>
+        </article>
+        <article class="mini-card">
+          <strong>0</strong>
+          <p>conflictos reales de artista/título para el mismo <code>track_id</code>.</p>
+        </article>
+      </div>
+
+      <div class="two-col" style="margin-top: 18px;">
+        <article class="diagram-card">
+          <strong>Hallazgo principal</strong>
+          <p>El profiling mostró que “deduplicar por conservar una sola fila” era insuficiente. El problema real era preservar la canción sin perder sus géneros.</p>
+        </article>
+        <article class="diagram-card">
+          <strong>Implicación inmediata</strong>
+          <p>El merge no podía depender de género. La conexión más confiable quedó en texto normalizado: <code>artista + canción</code>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="section-head">
+        <div class="section-sub">
+          <h2>Decisiones de calidad y cleaning</h2>
+          <p>Estas reglas salieron directamente de lo que encontré en el EDA.</p>
+        </div>
+      </div>
+
+      <div class="decision-grid">
+        <article class="decision-card">
+          <strong>1. Granularidad correcta</strong>
+          <ul>
+            <li>Tomé <code>track_id</code> como identificador canónico del track.</li>
+            <li>No dedupliqué por nombre.</li>
+          </ul>
+        </article>
+        <article class="decision-card">
+          <strong>2. Géneros preservados</strong>
+          <ul>
+            <li>Agregué <code>track_genres</code>.</li>
+            <li>En el DW modelé <code>bridge_track_genre</code>.</li>
+          </ul>
+          <div class="field-list">
+            <span class="field-chip">track_genres</span>
+            <span class="field-chip">bridge_track_genre</span>
+          </div>
+        </article>
+        <article class="decision-card">
+          <strong>3. Popularidad trazable</strong>
+          <ul>
+            <li>Conservé un valor canónico.</li>
+            <li>También <code>popularity_min</code>, <code>popularity_max</code> y <code>popularity_conflict_flag</code>.</li>
+          </ul>
+          <div class="field-list">
+            <span class="field-chip">popularity_min</span>
+            <span class="field-chip">popularity_max</span>
+            <span class="field-chip">popularity_conflict_flag</span>
+          </div>
+        </article>
+        <article class="decision-card">
+          <strong>4. Texto normalizado</strong>
+          <ul>
+            <li>Creé <code>primary_artist</code>.</li>
+            <li>Normalicé <code>track_name</code>, <code>artist</code> y <code>nominee</code>.</li>
+          </ul>
+          <div class="field-list">
+            <span class="field-chip">primary_artist</span>
+            <span class="field-chip">track_name_normalized</span>
+            <span class="field-chip">artist_normalized</span>
+            <span class="field-chip">nominee_normalized</span>
+          </div>
+        </article>
+        <article class="decision-card">
+          <strong>5. Filas inválidas fuera</strong>
+          <ul>
+            <li>Eliminé filas de Spotify sin <code>track_id</code> o <code>track_name</code>.</li>
+            <li>Renombré la columna inicial vacía como <code>source_row_id</code>.</li>
+          </ul>
+        </article>
+        <article class="decision-card">
+          <strong>6. Limitación Grammy</strong>
+          <ul>
+            <li>Interpreté <code>winner</code> como winners-only porque siempre apareció en <code>True</code>.</li>
+            <li>No consideré válido concluir “quién pierde más” con este dataset.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="slide" id="airflow">
+      <div class="section-head">
+        <div class="section-sub">
+          <h2>Extracción y orquestación con Apache Airflow</h2>
+          <p>En el DAG dejé explícito el flujo completo: primero preparo la base fuente de Grammys, luego extraigo ambas fuentes, limpio, transformo, exporto el CSV y finalmente cargo el warehouse.</p>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="process-line">
+          <article class="step-card">
+            <div class="step-index">1</div>
+            <h3>Bootstrap DB</h3>
+            <p>Grammys se carga a SQLite antes de cualquier extracción.</p>
+          </article>
+          <article class="step-card">
+            <div class="step-index">2</div>
+            <h3>Extract Spotify</h3>
+            <p>Airflow lee el CSV con Python operators.</p>
+          </article>
+          <article class="step-card">
+            <div class="step-index">3</div>
+            <h3>Extract Grammys</h3>
+            <p>Airflow consulta la base y lleva el resultado a staging.</p>
+          </article>
+          <article class="step-card">
+            <div class="step-index">4</div>
+            <h3>Clean datasets</h3>
+            <p>Corre solo cuando ambas extracciones terminan bien.</p>
+          </article>
+          <article class="step-card">
+            <div class="step-index">5</div>
+            <h3>Transform & merge</h3>
+            <p>Construye el dataset enriquecido y las tablas del DW.</p>
+          </article>
+          <article class="step-card">
+            <div class="step-index">6</div>
+            <h3>Export CSV</h3>
+            <p>Guarda el dataset transformado para entrega y trazabilidad.</p>
+          </article>
+          <article class="step-card">
+            <div class="step-index">7</div>
+            <h3>Load DW</h3>
+            <p>Carga el modelo analítico final para el dashboard.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="dag-board">
+        <div class="dag-canvas">
+          <svg class="dag-lines" viewBox="0 0 1230 350" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M96 70 H118" stroke="#46657a" stroke-width="3" stroke-linecap="round"/>
+            <path d="M308 70 H352" stroke="#46657a" stroke-width="3" stroke-linecap="round"/>
+            <path d="M542 70 V126 H610" stroke="#46657a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M96 234 H118" stroke="#46657a" stroke-width="3" stroke-linecap="round"/>
+            <path d="M308 234 H508 V180 H610" stroke="#46657a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M800 152 H844" stroke="#46657a" stroke-width="3" stroke-linecap="round"/>
+            <path d="M1034 152 H1078" stroke="#46657a" stroke-width="3" stroke-linecap="round"/>
+            <path d="M1173 152 V180" stroke="#46657a" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+
+          <div class="dag-source db">
+            <div>
+              <strong>SQL DB</strong>
+              <span>Grammys</span>
+            </div>
+          </div>
+
+          <div class="dag-source csv">
+            <div>
+              <strong>CSV</strong>
+              <span>Spotify</span>
+            </div>
+          </div>
+
+          <article class="dag-node bootstrap">
+            <div class="dag-node-head">
+              <strong>bootstrap_grammy_source_db</strong>
+            </div>
+            <div class="dag-node-body">
+              <span class="operator-badge">PythonOperator</span>
+              <p>Carga el dataset de Grammys en SQLite para poder extraerlo desde base de datos.</p>
+            </div>
+          </article>
+
+          <article class="dag-node grammy">
+            <div class="dag-node-head">
+              <strong>extract_grammy_db</strong>
+            </div>
+            <div class="dag-node-body">
+              <span class="operator-badge">PythonOperator</span>
+              <p>Lee la tabla fuente de Grammys desde la base y la lleva a staging.</p>
+            </div>
+          </article>
+
+          <article class="dag-node spotify">
+            <div class="dag-node-head">
+              <strong>extract_spotify_csv</strong>
+            </div>
+            <div class="dag-node-body">
+              <span class="operator-badge">PythonOperator</span>
+              <p>Lee el archivo CSV de Spotify directamente con pandas.</p>
+            </div>
+          </article>
+
+          <article class="dag-node clean">
+            <div class="dag-node-head">
+              <strong>clean_datasets</strong>
+            </div>
+            <div class="dag-node-body">
+              <span class="operator-badge">PythonOperator</span>
+              <p>Normaliza columnas, resuelve duplicados y deja ambos datasets listos para integrar.</p>
+            </div>
+          </article>
+
+          <article class="dag-node transform">
+            <div class="dag-node-head">
+              <strong>transform_and_merge</strong>
+            </div>
+            <div class="dag-node-body">
+              <span class="operator-badge">PythonOperator</span>
+              <p>Hace el matching Spotify + Grammys y genera el dataset enriquecido.</p>
+            </div>
+          </article>
+
+          <article class="dag-node export">
+            <div class="dag-node-head">
+              <strong>export_csv_to_local_drive</strong>
+            </div>
+            <div class="dag-node-body">
+              <span class="operator-badge">PythonOperator</span>
+              <p>Exporta el CSV transformado al directorio de entrega configurado.</p>
+            </div>
+          </article>
+
+          <article class="dag-node load">
+            <div class="dag-node-head">
+              <strong>load_data_warehouse</strong>
+            </div>
+            <div class="dag-node-body">
+              <span class="operator-badge">PythonOperator</span>
+              <p>Carga las dimensiones, puentes y fact table del modelo analítico.</p>
+            </div>
+          </article>
+        </div>
+
+        <p class="dag-note">Cada caja corresponde a un <code>task_id</code> real del DAG <code>spotify_grammy_etl</code>. Esos nombres no se ejecutan en zsh como comandos; se ejecutan dentro de Airflow como tareas.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="transformacion">
+      <div class="section-head">
+        <div class="section-sub">
+          <h2>Transformación y merge</h2>
+          <p>Como no existe una llave compartida entre fuentes, diseñé el merge como matching textual controlado.</p>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="formula">Spotify:
+normalize(primary_artist) + normalize(track_name)
+
+            ↕ exact match
+
+Grammys:
+normalize(artist) + normalize(nominee)</div>
+
+        <div class="story-grid">
+          <article class="story-card">
+            <strong>261</strong>
+            <p>matches exactos por track + artista.</p>
+          </article>
+          <article class="story-card">
+            <strong>5,661</strong>
+            <p>tracks enriquecidos solo por historial del artista.</p>
+          </article>
+          <article class="story-card">
+            <strong>83,818</strong>
+            <p>tracks sin match en el cruce actual.</p>
+          </article>
+          <article class="story-card">
+            <strong>3 niveles de match</strong>
+            <p><code>track_and_artist</code>, <code>artist_only</code> y <code>no_match</code>.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top: 18px;">
+        <article class="diagram-card">
+          <strong>Distribución de tipos de match</strong>
+          <div class="bar-list" style="margin-top: 14px;">
+            <div class="bar-row">
+              <div class="bar-meta"><span>No match</span><span>93.39%</span></div>
+              <div class="bar-track"><div class="bar-fill navy" style="width: 93.39%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>Artist only</span><span>6.31%</span></div>
+              <div class="bar-track"><div class="bar-fill orange" style="width: 6.31%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>Track + artist</span><span>0.29%</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width: 0.29%; min-width: 10px;"></div></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="diagram-card">
+          <strong>Por qué existe <code>artist_only</code> y no <code>track_only</code></strong>
+          <p>
+            Cuando encontré coincidencia exacta entre <code>primary_artist</code> y <code>track_name</code> contra
+            <code>artist</code> y <code>nominee</code>, clasifiqué el registro como <code>track_and_artist</code>.
+          </p>
+          <p style="margin-top: 10px;">
+            Si la canción no hacía match exacto pero el artista sí tenía historial Grammy, preferí un enriquecimiento
+            seguro a nivel artista: <code>artist_only</code>. No creé <code>track_only</code> porque un título de canción
+            sin artista sería ambiguo y produciría falsos positivos.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="slide" id="modelo">
+      <div class="section-head">
+        <div class="section-sub">
+          <h2>Star schema del Data Warehouse</h2>
+          <p>Diseñé el modelo para analytics: grain explícito, medidas en un fact central y puentes para relaciones muchos-a-muchos.</p>
+        </div>
+      </div>
+
+      <div class="four-col">
+        <article class="mini-card">
+          <strong>Grano</strong>
+          <p>1 fila por track único de Spotify en <code>fact_track_performance</code>.</p>
+        </article>
+        <article class="mini-card">
+          <strong>Entidades</strong>
+          <p><code>dim_track</code>, <code>dim_artist</code>, <code>dim_genre</code>, <code>dim_award</code>.</p>
+        </article>
+        <article class="mini-card">
+          <strong>Medidas</strong>
+          <p>Popularidad, duración, danceability, energy, valence, instrumentalness, tempo y flags Grammy.</p>
+        </article>
+        <article class="mini-card">
+          <strong>Relaciones</strong>
+          <p>Track-genre y track-award se resuelven con tablas puente para no duplicar medidas.</p>
+        </article>
+      </div>
+
+      <div class="schema-board">
+        <div class="schema-star">
+          <svg class="schema-lines" viewBox="0 0 980 660" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M264 168 H320 Q334 168 334 184 V290 H364" fill="none" stroke="#3e6679" stroke-width="3"/>
+            <path d="M716 168 H660 Q646 168 646 184 V290 H616" fill="none" stroke="#3e6679" stroke-width="3"/>
+            <path d="M264 500 H320 Q334 500 334 482 V382 H364" fill="none" stroke="#3e6679" stroke-width="3"/>
+            <path d="M716 500 H660 Q646 500 646 482 V382 H616" fill="none" stroke="#3e6679" stroke-width="3"/>
+
+            <rect x="260" y="164" width="8" height="8" transform="rotate(45 264 168)" fill="#3e6679"/>
+            <rect x="712" y="164" width="8" height="8" transform="rotate(45 716 168)" fill="#3e6679"/>
+            <rect x="260" y="496" width="8" height="8" transform="rotate(45 264 500)" fill="#3e6679"/>
+            <rect x="712" y="496" width="8" height="8" transform="rotate(45 716 500)" fill="#3e6679"/>
+
+            <rect x="360" y="286" width="8" height="8" transform="rotate(45 364 290)" fill="#3e6679"/>
+            <rect x="612" y="286" width="8" height="8" transform="rotate(45 616 290)" fill="#3e6679"/>
+            <rect x="360" y="378" width="8" height="8" transform="rotate(45 364 382)" fill="#3e6679"/>
+            <rect x="612" y="378" width="8" height="8" transform="rotate(45 616 382)" fill="#3e6679"/>
+          </svg>
+
+          <div class="schema-badge track">directo</div>
+          <div class="schema-badge award">via bridge_track_award</div>
+          <div class="schema-badge artist">directo</div>
+          <div class="schema-badge genre">via bridge_track_genre</div>
+
+          <div class="schema-table dim-track">
+            <div class="schema-head">DIM_TRACK</div>
+            <div class="schema-body">
+              <div class="schema-row key">track_key</div>
+              <div class="schema-row">track_id</div>
+              <div class="schema-row">track_name</div>
+              <div class="schema-row">album_name</div>
+              <div class="schema-row">primary_artist_name</div>
+              <div class="schema-row">all_genres</div>
+              <div class="schema-row">track_match_type</div>
+            </div>
+          </div>
+
+          <div class="schema-table dim-award">
+            <div class="schema-head">DIM_AWARD</div>
+            <div class="schema-body">
+              <div class="schema-row key">award_key</div>
+              <div class="schema-row">award_year</div>
+              <div class="schema-row">award_category</div>
+              <div class="schema-row">nominee</div>
+              <div class="schema-row">artist</div>
+              <div class="schema-row">winner_flag</div>
+            </div>
+          </div>
+
+          <div class="schema-table fact">
+            <div class="schema-head">FACT TABLE</div>
+            <div class="schema-body">
+              <div class="schema-row key">track_key</div>
+              <div class="schema-row">artist_key</div>
+              <div class="schema-row">popularity</div>
+              <div class="schema-row">duration_ms</div>
+              <div class="schema-row">danceability</div>
+              <div class="schema-row">energy</div>
+              <div class="schema-row">instrumentalness</div>
+              <div class="schema-row">track_grammy_win_count</div>
+            </div>
+          </div>
+
+          <div class="schema-table dim-artist">
+            <div class="schema-head">DIM_ARTIST</div>
+            <div class="schema-body">
+              <div class="schema-row key">artist_key</div>
+              <div class="schema-row">artist_name</div>
+              <div class="schema-row">grammy_win_count</div>
+              <div class="schema-row">distinct_award_categories</div>
+              <div class="schema-row">first_grammy_year</div>
+              <div class="schema-row">last_grammy_year</div>
+            </div>
+          </div>
+
+          <div class="schema-table dim-genre">
+            <div class="schema-head">DIM_GENRE</div>
+            <div class="schema-body">
+              <div class="schema-row key">genre_key</div>
+              <div class="schema-row">genre_name</div>
+              <div class="schema-row">many-to-many</div>
+              <div class="schema-row">track genre map</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top: 18px;">
+        <article class="diagram-card">
+          <strong>Por qué este diseño sí soporta analytical queries</strong>
+          <p>Las métricas viven una sola vez en el fact. Eso permite calcular promedios y comparaciones sin sesgo por duplicación de filas.</p>
+        </article>
+        <article class="diagram-card">
+          <strong>Por qué usamos tablas puente</strong>
+          <p>Un track puede tener varios géneros y varios premios asociados. Si eso se guardara dentro del fact, repetiríamos <code>popularity</code>, <code>danceability</code> y el resto de medidas.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="slide" id="insights">
+      <div class="section-head">
+        <div class="section-sub">
+          <h2>Qué respondió el warehouse</h2>
+          <p>Esta parte ya no habla del proceso; aquí muestro lo que pude responder con el modelo final.</p>
+        </div>
+      </div>
+
+      <div class="answer-grid">
+        <article class="answer-card">
+          <strong>Popularidad</strong>
+          <p>Los tracks con match exacto Grammy tienen una popularidad promedio de <strong>46.49</strong> vs <strong>33.16</strong> en los no matched.</p>
+          <p style="margin-top: 10px;"><span class="pill orange">+40.2% de lift</span></p>
+        </article>
+        <article class="answer-card">
+          <strong>Danceability</strong>
+          <p>Los tracks matched son apenas más bailables: <strong>0.5909</strong> vs <strong>0.5621</strong>.</p>
+          <p style="margin-top: 10px;"><span class="pill teal">Gap: +0.0288</span></p>
+        </article>
+        <article class="answer-card">
+          <strong>Instrumentalness</strong>
+          <p>Los tracks matched son mucho menos instrumentales: <strong>0.0497</strong> vs <strong>0.1738</strong>.</p>
+          <p style="margin-top: 10px;"><span class="pill">Gap: -0.1241</span></p>
+        </article>
+        <article class="answer-card">
+          <strong>Energía</strong>
+          <p>La energía promedio es muy similar: <strong>0.6442</strong> vs <strong>0.6344</strong>.</p>
+          <p style="margin-top: 10px;"><span class="pill gold">Gap: +0.0098</span></p>
+        </article>
+      </div>
+
+      <div class="insight-compare">
+        <article class="compare-card">
+          <div class="compare-head">
+            <h3>Géneros con más tracks matched</h3>
+            <strong>Top 5</strong>
+          </div>
+          <div class="bar-list">
+            <div class="bar-row">
+              <div class="bar-meta"><span>country</span><span>26</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width: 100%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>metal</span><span>20</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width: 77%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>hard-rock</span><span>20</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width: 77%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>soul</span><span>20</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width: 77%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>grunge</span><span>19</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width: 73%;"></div></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="compare-card">
+          <div class="compare-head">
+            <h3>Categorías con más matches exactos</h3>
+            <strong>Top 5</strong>
+          </div>
+          <div class="bar-list">
+            <div class="bar-row">
+              <div class="bar-meta"><span>Record Of The Year</span><span>30</span></div>
+              <div class="bar-track"><div class="bar-fill orange" style="width: 100%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>Best Hard Rock Performance</span><span>17</span></div>
+              <div class="bar-track"><div class="bar-fill orange" style="width: 57%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>Best Pop Solo Performance</span><span>16</span></div>
+              <div class="bar-track"><div class="bar-fill orange" style="width: 53%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>Best Female Pop Vocal Performance</span><span>16</span></div>
+              <div class="bar-track"><div class="bar-fill orange" style="width: 53%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>Best Metal Performance</span><span>12</span></div>
+              <div class="bar-track"><div class="bar-fill orange" style="width: 40%;"></div></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="compare-card">
+          <div class="compare-head">
+            <h3>Artistas visibles con más wins Grammy</h3>
+            <strong>Top 5</strong>
+          </div>
+          <div class="bar-list">
+            <div class="bar-row">
+              <div class="bar-meta"><span>Aretha Franklin</span><span>16</span></div>
+              <div class="bar-track"><div class="bar-fill navy" style="width: 100%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>Beyoncé</span><span>13</span></div>
+              <div class="bar-track"><div class="bar-fill navy" style="width: 81%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>Bruce Springsteen</span><span>13</span></div>
+              <div class="bar-track"><div class="bar-fill navy" style="width: 81%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>Ella Fitzgerald</span><span>13</span></div>
+              <div class="bar-track"><div class="bar-fill navy" style="width: 81%;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-meta"><span>Stevie Wonder</span><span>13</span></div>
+              <div class="bar-track"><div class="bar-fill navy" style="width: 81%;"></div></div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="two-col" style="margin-top: 18px;">
+        <article class="diagram-card">
+          <strong>Respuesta corta a las preguntas iniciales</strong>
+          <ul style="margin-top: 10px;">
+            <li>La popularidad sí parece importar: los matched son claramente más populares.</li>
+            <li>La danceability ayuda un poco, pero no es una diferencia dominante.</li>
+            <li>Los tracks matched tienden a ser menos instrumentales.</li>
+            <li>Con este dataset no es serio concluir quién “pierde más”, porque Grammys se comporta como winners-only.</li>
+          </ul>
+        </article>
+        <article class="diagram-card">
+          <strong>KPIs y charts que soporta el dashboard</strong>
+          <ul style="margin-top: 10px;">
+            <li>KPIs: tracks en DW, exact matches, popularidad promedio, conflictos de popularidad.</li>
+            <li>Charts: artistas top por Grammy wins, géneros por popularidad promedio y matched tracks por año.</li>
+            <li>Todos consultan el Data Warehouse, no los CSV raw.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="slide" id="dashboard">
+      <div class="section-head">
+        <div class="section-sub">
+          <h2>Dashboard embebido</h2>
+          <p>El cierre de la presentación es el dashboard conectado al Data Warehouse. Si ya está corriendo Streamlit, se renderiza aquí.</p>
+        </div>
+      </div>
+
+      <div class="dashboard-wrap">
+        <div class="dashboard-toolbar">
+          <p>URL esperada del dashboard: <a class="dashboard-url-link" href="http://localhost:8501/?embedded=true" target="_blank" rel="noreferrer">http://localhost:8501/?embedded=true</a></p>
+          <a class="button-link primary dashboard-open-link" href="http://localhost:8501/?embedded=true" target="_blank" rel="noreferrer">Abrir en pestaña nueva</a>
+        </div>
+        <iframe
+          id="dashboard-frame"
+          title="Spotify + Grammy Dashboard"
+          src="http://localhost:8501/?embedded=true"
+          loading="lazy">
+        </iframe>
+      </div>
+    </section>
+
+    <div class="footer">
+      Presentación generada para defender el workshop desde el EDA hasta el dashboard final.
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const dashboardUrl = params.get("dashboard") || "http://localhost:8501/?embedded=true";
+      const iframe = document.getElementById("dashboard-frame");
+      const urlLink = document.querySelector(".dashboard-url-link");
+      const openLink = document.querySelector(".dashboard-open-link");
+      iframe.src = dashboardUrl;
+      if (urlLink) {
+        urlLink.href = dashboardUrl;
+        urlLink.textContent = dashboardUrl;
+      }
+      if (openLink) {
+        openLink.href = dashboardUrl;
+      }
+    }());
+  </script>
+</body>
+</html>
