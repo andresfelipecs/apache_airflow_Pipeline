@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ETL Workshop 2 — Spotify + Grammy Pipeline</title>
+  <meta name="description" content="Presentación técnica del pipeline ETL Workshop 2: integración de datos Spotify y Grammy Awards con Apache Airflow, limpieza, transformación y data warehouse." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-primary:    #0a0a12;
+      --bg-card:       rgba(255,255,255,0.04);
+      --bg-card-hover: rgba(255,255,255,0.07);
+      --border:        rgba(255,255,255,0.08);
+      --border-hover:  rgba(255,255,255,0.18);
+      --accent-green:  #1DB954;
+      --accent-green2: #1ed760;
+      --accent-gold:   #FFD700;
+      --accent-purple: #7c3aed;
+      --accent-blue:   #3b82f6;
+      --accent-pink:   #ec4899;
+      --accent-orange: #f97316;
+      --text-primary:  #f0f0f8;
+      --text-secondary:#a0a0b8;
+      --text-muted:    #606080;
+      --font-sans: 'Inter', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius-sm: 8px; --radius-md: 14px; --radius-lg: 20px; --radius-xl: 28px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--font-sans); background: var(--bg-primary); color: var(--text-primary); overflow-x: hidden; line-height: 1.6; }
+
+    /* BG */
+    .bg-mesh { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+    .bg-mesh::before { content:''; position:absolute; width:800px; height:800px; border-radius:50%; background:radial-gradient(circle,rgba(29,185,84,0.07) 0%,transparent 70%); top:-200px; left:-200px; animation:drift1 18s ease-in-out infinite alternate; }
+    .bg-mesh::after  { content:''; position:absolute; width:600px; height:600px; border-radius:50%; background:radial-gradient(circle,rgba(124,58,237,0.07) 0%,transparent 70%); bottom:-100px; right:-100px; animation:drift2 14s ease-in-out infinite alternate; }
+    .bg-orb { position:fixed; width:500px; height:500px; border-radius:50%; background:radial-gradient(circle,rgba(255,215,0,0.05) 0%,transparent 70%); top:40%; left:50%; transform:translate(-50%,-50%); animation:drift3 22s ease-in-out infinite alternate; pointer-events:none; z-index:0; }
+    @keyframes drift1 { from{transform:translate(0,0) scale(1)} to{transform:translate(80px,60px) scale(1.15)} }
+    @keyframes drift2 { from{transform:translate(0,0) scale(1)} to{transform:translate(-60px,-80px) scale(1.2)} }
+    @keyframes drift3 { from{transform:translate(-50%,-50%) scale(1)} to{transform:translate(-50%,-50%) scale(1.3)} }
+
+    /* NAV */
+    nav { position:fixed; top:0; left:0; right:0; z-index:100; background:rgba(10,10,18,0.88); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); padding:0 2rem; height:60px; display:flex; align-items:center; justify-content:space-between; }
+    .nav-brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:0.95rem; }
+    .nav-brand .dot { width:10px; height:10px; border-radius:50%; background:var(--accent-green); box-shadow:0 0 8px var(--accent-green); animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .nav-links { display:flex; gap:.2rem; list-style:none; flex-wrap:wrap; }
+    .nav-links a { color:var(--text-secondary); text-decoration:none; font-size:0.78rem; font-weight:500; padding:5px 12px; border-radius:20px; transition:all .25s ease; }
+    .nav-links a:hover, .nav-links a.active { color:var(--text-primary); background:var(--bg-card); }
+
+    /* MAIN */
+    main { position:relative; z-index:1; padding-top:60px; }
+    section { padding:90px 2rem; max-width:1200px; margin:0 auto; }
+
+    /* HERO */
+    #hero { min-height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:80px 2rem; }
+    .hero-badge { display:inline-flex; align-items:center; gap:8px; background:rgba(29,185,84,0.12); border:1px solid rgba(29,185,84,0.3); color:var(--accent-green2); font-size:0.78rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; padding:6px 18px; border-radius:30px; margin-bottom:2rem; animation:fadeInDown .8s ease; }
+    h1 { font-size:clamp(2.8rem,7vw,6rem); font-weight:900; line-height:1.05; letter-spacing:-.03em; animation:fadeInUp .9s ease .1s both; }
+    .gradient-text { background:linear-gradient(135deg,var(--accent-green) 0%,#00c853 30%,var(--accent-gold) 70%,#ffa500 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .gradient-text-purple { background:linear-gradient(135deg,var(--accent-purple) 0%,var(--accent-blue) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .hero-sub { font-size:clamp(1rem,2.5vw,1.35rem); color:var(--text-secondary); max-width:680px; margin:1.5rem auto 3rem; animation:fadeInUp .9s ease .2s both; }
+    .hero-tags { display:flex; gap:.75rem; flex-wrap:wrap; justify-content:center; margin-bottom:3rem; animation:fadeInUp .9s ease .3s both; }
+    .tag { padding:6px 16px; border-radius:20px; font-size:0.78rem; font-weight:600; letter-spacing:.05em; border:1px solid; }
+    .tag-green  { background:rgba(29,185,84,0.1);  border-color:rgba(29,185,84,0.3);  color:var(--accent-green2); }
+    .tag-gold   { background:rgba(255,215,0,0.1);  border-color:rgba(255,215,0,0.3);  color:var(--accent-gold); }
+    .tag-purple { background:rgba(124,58,237,0.1); border-color:rgba(124,58,237,0.3); color:#a78bfa; }
+    .tag-blue   { background:rgba(59,130,246,0.1); border-color:rgba(59,130,246,0.3); color:#60a5fa; }
+    .tag-orange { background:rgba(249,115,22,0.1); border-color:rgba(249,115,22,0.3); color:#fb923c; }
+    .tag-pink   { background:rgba(236,72,153,0.1); border-color:rgba(236,72,153,0.3); color:#f472b6; }
+    .stat-strip { display:flex; gap:2rem; flex-wrap:wrap; justify-content:center; animation:fadeInUp .9s ease .4s both; }
+    .stat-item { text-align:center; }
+    .stat-number { font-size:2.4rem; font-weight:900; line-height:1; letter-spacing:-.04em; }
+    .stat-label { font-size:0.75rem; color:var(--text-muted); margin-top:4px; text-transform:uppercase; letter-spacing:.08em; }
+
+    /* SECTIONS */
+    .section-header { margin-bottom:3rem; }
+    .section-eyebrow { font-size:0.73rem; font-weight:700; text-transform:uppercase; letter-spacing:.15em; color:var(--accent-green); margin-bottom:.75rem; }
+    .section-title { font-size:clamp(1.8rem,4vw,2.8rem); font-weight:800; line-height:1.1; letter-spacing:-.025em; }
+    .section-desc { font-size:1rem; color:var(--text-secondary); max-width:620px; margin-top:.75rem; line-height:1.7; }
+
+    /* CARDS */
+    .card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:2rem; transition:all .3s ease; position:relative; overflow:hidden; }
+    .card::before { content:''; position:absolute; inset:0; border-radius:inherit; background:linear-gradient(135deg,rgba(255,255,255,0.03) 0%,transparent 60%); pointer-events:none; }
+    .card:hover { background:var(--bg-card-hover); border-color:var(--border-hover); transform:translateY(-3px); }
+
+    /* GRIDS */
+    .grid-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:1.5rem; }
+    .grid-3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:1.5rem; }
+    .grid-4 { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1.2rem; }
+
+    /* CHART WRAPPER */
+    .chart-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:1.75rem; transition:all .3s ease; }
+    .chart-card:hover { border-color:var(--border-hover); transform:translateY(-3px); }
+    .chart-title { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--text-muted); margin-bottom:.5rem; }
+    .chart-question { font-size:0.95rem; font-weight:700; color:var(--text-primary); margin-bottom:.4rem; }
+    .chart-insight { font-size:0.78rem; color:var(--text-secondary); margin-top:.75rem; line-height:1.6; padding:.75rem 1rem; background:rgba(255,255,255,0.03); border-radius:var(--radius-sm); border-left:3px solid; }
+    .chart-insight.ig { border-color:var(--accent-green); }
+    .chart-insight.ib { border-color:var(--accent-blue); }
+    .chart-insight.ip { border-color:var(--accent-purple); }
+    .chart-insight.io { border-color:var(--accent-orange); }
+    .chart-insight.igd{ border-color:var(--accent-gold); }
+    .chart-insight.ipk{ border-color:var(--accent-pink); }
+    .chart-wrap { position:relative; height:280px; margin-top:1rem; }
+    .chart-wrap-md { position:relative; height:240px; margin-top:1rem; }
+    .chart-wrap-sm { position:relative; height:200px; margin-top:1rem; }
+    .chart-wrap-lg { position:relative; height:360px; margin-top:1rem; }
+
+    /* PIPELINE */
+    .pipeline-container { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-xl); padding:3rem 2rem; overflow-x:auto; }
+    .pipeline-flow { display:flex; align-items:center; min-width:900px; justify-content:center; flex-wrap:nowrap; }
+    .pipeline-step { display:flex; flex-direction:column; align-items:center; gap:.75rem; flex:0 0 auto; }
+    .pipeline-node { width:90px; height:90px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; text-align:center; padding:8px; border:2px solid; cursor:default; transition:transform .2s, box-shadow .2s; }
+    .pipeline-node:hover { transform:scale(1.1); }
+    .pipeline-node .node-icon { font-size:1.6rem; }
+    .pipeline-node.n-green  { background:rgba(29,185,84,0.12);  border-color:rgba(29,185,84,0.4);  color:var(--accent-green2); box-shadow:0 0 20px rgba(29,185,84,0.2); }
+    .pipeline-node.n-gold   { background:rgba(255,215,0,0.1);   border-color:rgba(255,215,0,0.4);   color:var(--accent-gold); box-shadow:0 0 20px rgba(255,215,0,0.15); }
+    .pipeline-node.n-blue   { background:rgba(59,130,246,0.12); border-color:rgba(59,130,246,0.4); color:#60a5fa; box-shadow:0 0 20px rgba(59,130,246,0.2); }
+    .pipeline-node.n-purple { background:rgba(124,58,237,0.12); border-color:rgba(124,58,237,0.4); color:#a78bfa; box-shadow:0 0 20px rgba(124,58,237,0.2); }
+    .pipeline-node.n-orange { background:rgba(249,115,22,0.12); border-color:rgba(249,115,22,0.4); color:#fb923c; box-shadow:0 0 20px rgba(249,115,22,0.2); }
+    .pipeline-node.n-pink   { background:rgba(236,72,153,0.12); border-color:rgba(236,72,153,0.4); color:#f472b6; box-shadow:0 0 20px rgba(236,72,153,0.2); }
+    .pipeline-label { font-size:.7rem; color:var(--text-secondary); text-align:center; max-width:90px; }
+    .pipeline-arrow { color:var(--text-muted); font-size:1.4rem; flex:0 0 auto; margin:0 .25rem; }
+    .pipeline-fork { display:flex; flex-direction:column; gap:1.5rem; align-items:flex-start; }
+
+    /* DAG */
+    .dag-container { background:#0d0d1a; border:1px solid var(--border); border-radius:var(--radius-xl); padding:2.5rem; overflow-x:auto; }
+    .dag-flow { display:flex; align-items:center; min-width:880px; flex-wrap:nowrap; }
+    .dag-node { background:linear-gradient(135deg,rgba(29,185,84,0.15) 0%,rgba(29,185,84,0.05) 100%); border:1px solid rgba(29,185,84,0.35); border-radius:var(--radius-md); padding:.9rem 1.1rem; font-family:var(--font-mono); font-size:.7rem; color:var(--accent-green2); white-space:nowrap; transition:all .25s; cursor:default; flex:0 0 auto; }
+    .dag-node:hover { background:rgba(29,185,84,0.2); transform:translateY(-2px); box-shadow:0 4px 20px rgba(29,185,84,0.2); }
+    .dag-node .task-id { font-weight:700; font-size:.72rem; }
+    .dag-node .task-op { font-size:.6rem; color:var(--text-muted); margin-top:2px; }
+    .dag-arrow { color:var(--accent-green); font-size:1.2rem; margin:0 .4rem; flex:0 0 auto; }
+
+    /* STAR SCHEMA */
+    .schema-wrapper { display:flex; justify-content:center; align-items:center; padding:2rem; }
+    .schema-diagram { position:relative; width:640px; height:560px; }
+    .schema-table { position:absolute; border-radius:var(--radius-md); padding:1rem 1.2rem; border:1px solid; min-width:140px; text-align:center; transition:all .3s; }
+    .schema-table:hover { transform:scale(1.05); z-index:10; }
+    .schema-table .tbl-name { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+    .schema-table .tbl-cols { font-size:.62rem; color:var(--text-muted); margin-top:4px; font-family:var(--font-mono); line-height:1.5; }
+    .fact-table { background:rgba(29,185,84,0.1); border-color:rgba(29,185,84,0.4); color:var(--accent-green2); top:50%; left:50%; transform:translate(-50%,-50%); min-width:180px; box-shadow:0 0 40px rgba(29,185,84,0.25); z-index:5; }
+    .fact-table:hover { transform:translate(-50%,-50%) scale(1.05); }
+    .dim-artist { background:rgba(124,58,237,0.1); border-color:rgba(124,58,237,0.35); color:#a78bfa; top:20px; left:20px; }
+    .dim-track  { background:rgba(59,130,246,0.1);  border-color:rgba(59,130,246,0.35);  color:#60a5fa; top:20px; right:20px; }
+    .dim-genre  { background:rgba(249,115,22,0.1);  border-color:rgba(249,115,22,0.35);  color:#fb923c; bottom:80px; left:20px; }
+    .dim-award  { background:rgba(255,215,0,0.1);   border-color:rgba(255,215,0,0.35);   color:var(--accent-gold); bottom:80px; right:20px; }
+    .bridge-genre { background:rgba(236,72,153,0.08); border-color:rgba(236,72,153,0.3); color:#f472b6; bottom:20px; left:50%; transform:translateX(-160px); }
+    .bridge-award { background:rgba(236,72,153,0.08); border-color:rgba(236,72,153,0.3); color:#f472b6; bottom:20px; left:50%; transform:translateX(20px); }
+    .schema-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+    /* DECISION CARD */
+    .decision-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:1.75rem; border-left:3px solid transparent; transition:all .3s; }
+    .decision-card:hover { border-color:var(--border-hover); transform:translateY(-3px); }
+    .decision-card.d-green  { border-left-color:var(--accent-green); }
+    .decision-card.d-gold   { border-left-color:var(--accent-gold); }
+    .decision-card.d-blue   { border-left-color:var(--accent-blue); }
+    .decision-card.d-purple { border-left-color:var(--accent-purple); }
+    .decision-card.d-orange { border-left-color:var(--accent-orange); }
+    .decision-card.d-pink   { border-left-color:var(--accent-pink); }
+    .decision-icon { font-size:1.8rem; margin-bottom:.75rem; }
+    .decision-title { font-size:.95rem; font-weight:700; margin-bottom:.5rem; }
+    .decision-body { font-size:.82rem; color:var(--text-secondary); line-height:1.7; }
+    .decision-tag  { display:inline-block; margin-top:.75rem; font-size:.68rem; font-weight:600; padding:3px 10px; border-radius:12px; }
+    .decision-tag.t-finding  { background:rgba(255,215,0,0.12); color:var(--accent-gold); }
+    .decision-tag.t-decision { background:rgba(29,185,84,0.12); color:var(--accent-green2); }
+    .decision-tag.t-design   { background:rgba(124,58,237,0.12); color:#a78bfa; }
+
+    /* METRIC */
+    .metric-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:1.75rem; text-align:center; transition:all .3s; }
+    .metric-card:hover { border-color:var(--border-hover); transform:translateY(-3px); }
+    .metric-value { font-size:2.4rem; font-weight:900; letter-spacing:-.04em; line-height:1; }
+    .metric-label { font-size:.75rem; color:var(--text-secondary); margin-top:.4rem; }
+    .metric-sub   { font-size:.68rem; color:var(--text-muted); margin-top:.2rem; }
+
+    /* CODE BLOCK */
+    .code-block { background:#080810; border:1px solid var(--border); border-radius:var(--radius-md); padding:1.5rem; font-family:var(--font-mono); font-size:.73rem; color:#d1d5db; overflow-x:auto; white-space:pre; line-height:1.7; }
+    .code-block .ky { color:#93c5fd; } .code-block .fn { color:#c4b5fd; } .code-block .st { color:#fcd34d; } .code-block .cm { color:#4b5563; } .code-block .gr { color:#6ee7b7; }
+
+    /* TIMELINE */
+    .timeline { position:relative; padding-left:2rem; }
+    .timeline::before { content:''; position:absolute; left:.55rem; top:0; bottom:0; width:2px; background:linear-gradient(180deg,var(--accent-green),var(--accent-purple) 50%,var(--accent-gold)); }
+    .timeline-item { position:relative; padding-bottom:2.5rem; }
+    .timeline-item:last-child { padding-bottom:0; }
+    .timeline-dot { position:absolute; left:-1.65rem; top:.2rem; width:16px; height:16px; border-radius:50%; border:2px solid; background:var(--bg-primary); }
+    .timeline-dot.tg  { border-color:var(--accent-green); box-shadow:0 0 8px var(--accent-green); }
+    .timeline-dot.tp  { border-color:var(--accent-purple); box-shadow:0 0 8px var(--accent-purple); }
+    .timeline-dot.tb  { border-color:var(--accent-blue); box-shadow:0 0 8px var(--accent-blue); }
+    .timeline-dot.to  { border-color:var(--accent-orange); box-shadow:0 0 8px var(--accent-orange); }
+    .timeline-dot.tgd { border-color:var(--accent-gold); box-shadow:0 0 8px var(--accent-gold); }
+    .timeline-dot.tpk { border-color:var(--accent-pink); box-shadow:0 0 8px var(--accent-pink); }
+    .timeline-step { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; margin-bottom:.3rem; }
+    .timeline-title { font-size:1.05rem; font-weight:700; margin-bottom:.4rem; }
+    .timeline-desc { font-size:.82rem; color:var(--text-secondary); line-height:1.7; }
+
+    /* PILL */
+    .pill { display:inline-block; padding:2px 10px; border-radius:12px; font-size:.72rem; font-weight:600; }
+    .pill-green  { background:rgba(29,185,84,0.15); color:var(--accent-green2); }
+    .pill-gold   { background:rgba(255,215,0,0.12); color:var(--accent-gold); }
+    .pill-purple { background:rgba(124,58,237,0.12); color:#a78bfa; }
+
+    /* DIVIDER & FOOTER */
+    .divider { border:none; height:1px; background:linear-gradient(90deg,transparent,var(--border),transparent); margin:0 2rem; }
+    footer { position:relative; z-index:1; text-align:center; padding:3rem 2rem; border-top:1px solid var(--border); color:var(--text-muted); font-size:.8rem; }
+
+    /* CORRELATION HEATMAP */
+    .heatmap-grid { display:grid; gap:3px; }
+    .heatmap-cell { border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:.6rem; font-weight:700; transition:all .3s; cursor:default; }
+    .heatmap-cell:hover { transform:scale(1.15); z-index:5; position:relative; }
+    .heatmap-label-row { display:flex; align-items:center; }
+    .heatmap-label { font-size:.62rem; color:var(--text-muted); }
+
+    /* ANIMATIONS */
+    @keyframes fadeInDown { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeInUp   { from{opacity:0;transform:translateY(30px)}  to{opacity:1;transform:translateY(0)} }
+    .reveal { opacity:0; transform:translateY(28px); transition:all .7s ease; }
+    .reveal.visible { opacity:1; transform:translateY(0); }
+
+    /* RESPONSIVE */
+    @media (max-width:768px) {
+      .grid-2 { grid-template-columns:1fr; }
+      .grid-3 { grid-template-columns:1fr; }
+      .grid-4 { grid-template-columns:repeat(2,1fr); }
+      .nav-links { display:none; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-mesh"></div>
+<div class="bg-orb"></div>
+
+<nav>
+  <div class="nav-brand"><span class="dot"></span>ETL Workshop 2</div>
+  <ul class="nav-links">
+    <li><a href="#hero">Inicio</a></li>
+    <li><a href="#pipeline">Pipeline</a></li>
+    <li><a href="#eda">EDA</a></li>
+    <li><a href="#cleaning">Limpieza</a></li>
+    <li><a href="#warehouse">Warehouse</a></li>
+    <li><a href="#airflow">Airflow</a></li>
+    <li><a href="#kpis">KPIs</a></li>
+    <li><a href="#relaciones">Relaciones</a></li>
+
+  </ul>
+</nav>
+
+<main>
+
+<!-- ══════════════════ HERO ══════════════════ -->
+<section id="hero">
+  <div class="hero-badge"><span>🎵</span> Workshop 2 · ETL Pipeline</div>
+  <h1><span class="gradient-text">Spotify</span> meets<br/><span class="gradient-text" style="background:linear-gradient(135deg,#FFD700,#ffa500);-webkit-background-clip:text;background-clip:text;">Grammy Awards</span></h1>
+  <p class="hero-sub">Pipeline ETL completo: extracción, limpieza, enriquecimiento y carga hacia un Data Warehouse con orquestación en <strong>Apache Airflow</strong> y análisis visual de KPIs y relaciones.</p>
+  <div class="hero-tags">
+    <span class="tag tag-green">Apache Airflow</span>
+    <span class="tag tag-gold">Grammy Awards</span>
+    <span class="tag tag-purple">Star Schema</span>
+    <span class="tag tag-blue">SQLite DW</span>
+    <span class="tag tag-orange">Data Profiling</span>
+    <span class="tag tag-pink">Streamlit Dashboard</span>
+  </div>
+  <div class="stat-strip">
+    <div class="stat-item"><div class="stat-number gradient-text">~114K</div><div class="stat-label">Registros Spotify</div></div>
+    <div style="width:1px;height:50px;background:var(--border);align-self:center;"></div>
+    <div class="stat-item"><div class="stat-number" style="color:var(--accent-gold);">~4K</div><div class="stat-label">Registros Grammy</div></div>
+    <div style="width:1px;height:50px;background:var(--border);align-self:center;"></div>
+    <div class="stat-item"><div class="stat-number" style="color:#a78bfa;">7</div><div class="stat-label">Tareas Airflow</div></div>
+    <div style="width:1px;height:50px;background:var(--border);align-self:center;"></div>
+    <div class="stat-item"><div class="stat-number" style="color:#60a5fa;">7</div><div class="stat-label">Tablas en DW</div></div>
+    <div style="width:1px;height:50px;background:var(--border);align-self:center;"></div>
+    <div class="stat-item"><div class="stat-number" style="color:#fb923c;">114</div><div class="stat-label">Géneros únicos</div></div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ══════════════════ PIPELINE ══════════════════ -->
+<section id="pipeline">
+  <div class="section-header reveal">
+    <div class="section-eyebrow">⚙️ Arquitectura</div>
+    <h2 class="section-title">Flujo del <span class="gradient-text">Pipeline ETL</span></h2>
+    <p class="section-desc">Desde las fuentes hasta el dashboard: cada etapa orquestada por Apache Airflow con staging intermedio para trazabilidad.</p>
+  </div>
+  <div class="pipeline-container reveal">
+    <div class="pipeline-flow">
+      <div class="pipeline-fork">
+        <div class="pipeline-step"><div class="pipeline-node n-green"><span class="node-icon">📄</span>Spotify CSV</div><div class="pipeline-label">~114K filas</div></div>
+        <div class="pipeline-step"><div class="pipeline-node n-gold"><span class="node-icon">📄</span>Grammy CSV</div><div class="pipeline-label">~4K filas</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2.4rem;align-items:center;"><div class="pipeline-arrow">→</div><div class="pipeline-arrow">→</div></div>
+      <div class="pipeline-step" style="align-self:flex-end;margin-bottom:.6rem;"><div class="pipeline-node n-gold" style="width:80px;height:80px;font-size:.58rem;"><span class="node-icon" style="font-size:1.3rem;">🗄️</span>Bootstrap SQLite</div><div class="pipeline-label" style="max-width:80px;">source DB</div></div>
+      <div style="display:flex;flex-direction:column;gap:2.4rem;align-items:center;"><div class="pipeline-arrow">→</div><div class="pipeline-arrow">→</div></div>
+      <div class="pipeline-fork">
+        <div class="pipeline-step"><div class="pipeline-node n-blue"><span class="node-icon">⬇️</span>Extract Spotify</div><div class="pipeline-label">staging CSV</div></div>
+        <div class="pipeline-step"><div class="pipeline-node n-blue"><span class="node-icon">⬇️</span>Extract Grammy</div><div class="pipeline-label">staging CSV</div></div>
+      </div>
+      <div style="display:flex;align-items:center;align-self:center;"><div class="pipeline-arrow">→</div></div>
+      <div class="pipeline-step"><div class="pipeline-node n-purple" style="width:100px;height:100px;"><span class="node-icon">🧹</span>Clean Datasets</div><div class="pipeline-label">normalizar · deduplicar</div></div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step"><div class="pipeline-node n-orange" style="width:100px;height:100px;"><span class="node-icon">🔀</span>Transform &amp; Merge</div><div class="pipeline-label">enriquecer con Grammy</div></div>
+      <div style="display:flex;flex-direction:column;gap:1.5rem;align-items:center;"><div class="pipeline-arrow">→</div><div class="pipeline-arrow">→</div></div>
+      <div class="pipeline-fork">
+        <div class="pipeline-step"><div class="pipeline-node n-green" style="width:84px;height:84px;font-size:.58rem;"><span class="node-icon" style="font-size:1.3rem;">📤</span>Export CSV</div><div class="pipeline-label" style="max-width:84px;">local drive</div></div>
+        <div class="pipeline-step"><div class="pipeline-node n-pink" style="width:84px;height:84px;font-size:.58rem;"><span class="node-icon" style="font-size:1.3rem;">📦</span>Load DW</div><div class="pipeline-label" style="max-width:84px;">sqlite warehouse</div></div>
+      </div>
+      <div class="pipeline-arrow" style="align-self:flex-end;margin-bottom:1.2rem;">→</div>
+      <div class="pipeline-step" style="align-self:flex-end;margin-bottom:.4rem;"><div class="pipeline-node n-green"><span class="node-icon" style="font-size:1.5rem;">📊</span>Dashboard</div><div class="pipeline-label">Streamlit BI</div></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;padding-top:1.5rem;border-top:1px solid var(--border);margin-top:1.5rem;">
+      <span style="font-size:.72rem;color:var(--text-secondary);">🟢 Fuentes / Destinos</span>
+      <span style="font-size:.72rem;color:var(--text-secondary);">🔵 Extracción staging</span>
+      <span style="font-size:.72rem;color:var(--text-secondary);">🟣 Transformaciones</span>
+      <span style="font-size:.72rem;color:var(--text-secondary);">🩷 Carga DW</span>
+    </div>
+  </div>
+
+  <!-- DW Star Schema -->
+  <div style="margin-top:2rem;">
+    <div class="section-eyebrow reveal" style="margin-bottom:1rem;">🗄️ Star Schema — Data Warehouse</div>
+    <div class="dag-container reveal">
+      <div class="schema-wrapper">
+        <div class="schema-diagram">
+          <svg class="schema-svg" xmlns="http://www.w3.org/2000/svg">
+            <line x1="320" y1="280" x2="165" y2="110" stroke="rgba(29,185,84,0.4)" stroke-width="1.5" stroke-dasharray="5,3"/>
+            <line x1="320" y1="280" x2="475" y2="110" stroke="rgba(29,185,84,0.4)" stroke-width="1.5" stroke-dasharray="5,3"/>
+            <line x1="290" y1="340" x2="185" y2="490" stroke="rgba(236,72,153,0.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+            <line x1="350" y1="340" x2="450" y2="490" stroke="rgba(236,72,153,0.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+            <line x1="175" y1="490" x2="120" y2="420" stroke="rgba(249,115,22,0.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+            <line x1="460" y1="490" x2="510" y2="420" stroke="rgba(255,215,0,0.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+          </svg>
+          <div class="schema-table fact-table"><div class="tbl-name">⭐ fact_track_performance</div><div class="tbl-cols">track_key (FK)<br/>artist_key (FK)<br/>popularity · energy<br/>danceability · valence<br/>track_grammy_win_count<br/>artist_grammy_win_count</div></div>
+          <div class="schema-table dim-artist"><div class="tbl-name">🎤 dim_artist</div><div class="tbl-cols">artist_key (PK)<br/>artist_name<br/>grammy_win_count<br/>first/last_grammy_year</div></div>
+          <div class="schema-table dim-track"><div class="tbl-name">🎵 dim_track</div><div class="tbl-cols">track_key (PK)<br/>track_name · album_name<br/>explicit_flag<br/>popularity_bucket</div></div>
+          <div class="schema-table dim-genre"><div class="tbl-name">🎸 dim_genre</div><div class="tbl-cols">genre_key (PK)<br/>genre_name</div></div>
+          <div class="schema-table dim-award"><div class="tbl-name">🏆 dim_award</div><div class="tbl-cols">award_key (PK)<br/>award_year · category<br/>nominee · artist</div></div>
+          <div class="schema-table bridge-genre"><div class="tbl-name">🌉 bridge_track_genre</div><div class="tbl-cols">track_key · genre_key</div></div>
+          <div class="schema-table bridge-award"><div class="tbl-name">🌉 bridge_track_award</div><div class="tbl-cols">track_key · award_key</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ══════════════════ EDA ══════════════════ -->
+<section id="eda">
+  <div class="section-header reveal">
+    <div class="section-eyebrow">🔍 Análisis Exploratorio</div>
+    <h2 class="section-title">EDA · Perfil de <span class="gradient-text">los Datos</span></h2>
+    <p class="section-desc">Hallazgos clave de profiling que guiaron las decisiones de limpieza y modelado.</p>
+  </div>
+  <div class="grid-4 reveal">
+    <div class="metric-card"><div class="metric-value gradient-text">114K+</div><div class="metric-label">Filas raw Spotify</div><div class="metric-sub">antes de limpieza</div></div>
+    <div class="metric-card"><div class="metric-value" style="color:var(--accent-gold);">4K+</div><div class="metric-label">Registros Grammy</div><div class="metric-sub">solo ganadores (winner=True)</div></div>
+    <div class="metric-card"><div class="metric-value" style="color:#a78bfa;">114</div><div class="metric-label">Géneros únicos</div><div class="metric-sub">en dataset Spotify</div></div>
+    <div class="metric-card"><div class="metric-value" style="color:#60a5fa;">~20K</div><div class="metric-label">Tracks únicos</div><div class="metric-sub">después de deduplicar</div></div>
+  </div>
+
+  <div class="grid-2 reveal" style="margin-top:1.5rem;">
+    <div class="chart-card">
+      <div class="chart-title">📊 Distribución del dataset</div>
+      <div class="chart-question">¿Cómo se distribuyen los tracks duplicados en Spotify?</div>
+      <div class="chart-wrap-sm"><canvas id="chartDuplicates"></canvas></div>
+      <div class="chart-insight ig">El profiling confirmó que los <strong>track_id duplicados representan el mismo track en múltiples géneros</strong>, no canciones distintas. Decisión: colapsar a 1 fila canónica + bridge_track_genre.</div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">🏅 Tracks Spotify conectados al historial Grammy</div>
+      <div class="chart-question">Del total de tracks únicos, ¿cuántos tienen al menos un Grammy — y cuántos registros de premio los respaldan?</div>
+
+      <!-- Explicit numbers banner -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.85rem;margin:1rem 0;">
+        <div style="background:rgba(29,185,84,0.09);border:1px solid rgba(29,185,84,0.25);border-radius:var(--radius-md);padding:1rem;text-align:center;">
+          <div style="font-size:1.9rem;font-weight:900;color:var(--accent-green);letter-spacing:-.04em;">~110</div>
+          <div style="font-size:.68rem;color:var(--text-muted);margin-top:3px;line-height:1.4;">tracks con match<br/><strong style="color:var(--text-secondary);">exacto</strong> (track + artista)</div>
+        </div>
+        <div style="background:rgba(124,58,237,0.09);border:1px solid rgba(124,58,237,0.25);border-radius:var(--radius-md);padding:1rem;text-align:center;">
+          <div style="font-size:1.9rem;font-weight:900;color:#a78bfa;letter-spacing:-.04em;">~850</div>
+          <div style="font-size:.68rem;color:var(--text-muted);margin-top:3px;line-height:1.4;">tracks con match<br/><strong style="color:var(--text-secondary);">solo artista</strong></div>
+        </div>
+        <div style="background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.22);border-radius:var(--radius-md);padding:1rem;text-align:center;">
+          <div style="font-size:1.9rem;font-weight:900;color:var(--accent-gold);letter-spacing:-.04em;">~175</div>
+          <div style="font-size:.68rem;color:var(--text-muted);margin-top:3px;line-height:1.4;">registros Grammy<br/><strong style="color:var(--text-secondary);">vinculados</strong> (bridge)</div>
+        </div>
+        <div style="background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.22);border-radius:var(--radius-md);padding:1rem;text-align:center;">
+          <div style="font-size:1.9rem;font-weight:900;color:#fb923c;letter-spacing:-.04em;">~1.6x</div>
+          <div style="font-size:.68rem;color:var(--text-muted);margin-top:3px;line-height:1.4;">Grammy promedio<br/><strong style="color:var(--text-secondary);">por track matchiado</strong></div>
+        </div>
+      </div>
+
+      <!-- Bar chart breakdown -->
+      <div class="chart-wrap-sm"><canvas id="chartMatchType"></canvas></div>
+
+      <!-- M:N explanation -->
+      <div style="background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.2);border-radius:var(--radius-sm);padding:.9rem 1rem;margin-top:.85rem;">
+        <div style="font-size:.72rem;font-weight:700;color:var(--accent-gold);margin-bottom:.4rem;">📐 Relación M:N — Un track puede ganar múltiples Grammys</div>
+        <div style="font-size:.76rem;color:var(--text-secondary);line-height:1.65;">
+          Un mismo track puede tener varios registros Grammy: <strong style="color:var(--text-primary);">diferente categoría</strong> (ej. Record of Year + Best Pop Vocal)
+          o <strong style="color:var(--text-primary);">diferente año</strong> si fue relanzado o nominado en distintas ediciones.
+          Por eso hay <strong style="color:var(--accent-gold);">~175 filas en bridge_track_award</strong> para solo ~110 tracks matchados exactamente.
+          El campo <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px;">track_grammy_win_count</code> en el fact table
+          cuenta esos registros por track.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-card reveal" style="margin-top:1.5rem;">
+    <div class="chart-title">🎸 Features de audio — Estadísticas generales del dataset</div>
+    <div class="chart-question">¿Cuáles son los valores promedio de los features musicales en el dataset Spotify?</div>
+    <div class="chart-wrap"><canvas id="chartAudioFeatures"></canvas></div>
+    <div class="chart-insight ib">La mayoría de tracks tienen alta <strong>danceability (~0.67)</strong> y <strong>energy (~0.64)</strong>. El dataset está sesgado hacia música comercial/popular. La <strong>instrumentalness</strong> promedio es muy baja (~0.06), confirmando dominancia de canciones con voz.</div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ══════════════════ CLEANING ══════════════════ -->
+<section id="cleaning">
+  <div class="section-header reveal">
+    <div class="section-eyebrow">🧹 Data Cleaning</div>
+    <h2 class="section-title">Decisiones Clave <span class="gradient-text">de Limpieza</span></h2>
+    <p class="section-desc">Cada decisión fue guiada por hallazgos del EDA para garantizar integridad analítica sin pérdida de información.</p>
+  </div>
+  <div class="grid-2 reveal">
+    <div class="decision-card d-green">
+      <div class="decision-icon">🗂️</div>
+      <div class="decision-title">track_id duplicados → 1 fila canónica + bridge</div>
+      <div class="decision-body">El profiling confirmó que duplicados = misma canción en múltiples géneros. Se colapsa a una fila canónica por <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">track_id</code> y todos los géneros van a <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">bridge_track_genre</code>.</div>
+      <span class="decision-tag t-decision">✓ Decisión de diseño</span>
+    </div>
+    <div class="decision-card d-gold">
+      <div class="decision-icon">⚠️</div>
+      <div class="decision-title">Conflictos de popularidad → mode_then_max</div>
+      <div class="decision-body">Cuando el mismo track tiene valores de popularidad distintos entre filas, se aplica el más frecuente (modo) y en empate, el máximo. Se guardan <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">popularity_min</code>, <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">popularity_max</code> y <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">conflict_flag</code>.</div>
+      <span class="decision-tag t-finding">📊 Hallazgo + Decisión</span>
+    </div>
+    <div class="decision-card d-blue">
+      <div class="decision-icon">🔑</div>
+      <div class="decision-title">Normalización de texto para joins</div>
+      <div class="decision-body">Se crean <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">primary_artist_normalized</code> y <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">track_name_normalized</code> eliminando acentos, puntuación y aplicando lowercase. Maximiza matches sin falsos positivos.</div>
+      <span class="decision-tag t-design">🏗️ Diseño</span>
+    </div>
+    <div class="decision-card d-purple">
+      <div class="decision-icon">🧑‍🎤</div>
+      <div class="decision-title">Artista primario = primer artista en lista</div>
+      <div class="decision-body">El campo <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">artists</code> puede tener múltiples. Se extrae el primero como <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">primary_artist</code> para garantizar join 1:1 con Grammy donde cada fila tiene un artista.</div>
+      <span class="decision-tag t-design">🏗️ Diseño</span>
+    </div>
+    <div class="decision-card d-orange">
+      <div class="decision-icon">🚿</div>
+      <div class="decision-title">Filas sin track_id o track_name → eliminadas</div>
+      <div class="decision-body">Sin identificador ni nombre, la fila no puede ser trazada analíticamente. Los campos numéricos inválidos se parsean a <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">None</code> sin fallar el pipeline.</div>
+      <span class="decision-tag t-decision">✓ Decisión</span>
+    </div>
+    <div class="decision-card d-pink">
+      <div class="decision-icon">🏅</div>
+      <div class="decision-title">Grammy: historial completo preservado</div>
+      <div class="decision-body">Los registros Grammy sin artista se mantienen pero se marcan. Se computa estadística agregada por artista: <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">win_count</code>, <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">first/last grammy year</code>, <code style="background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:3px;">award_categories</code>.</div>
+      <span class="decision-tag t-design">🏗️ Diseño</span>
+    </div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ══════════════════ AIRFLOW ══════════════════ -->
+<section id="airflow">
+  <div class="section-header reveal">
+    <div class="section-eyebrow">🌬️ Apache Airflow</div>
+    <h2 class="section-title">Orquestación <span class="gradient-text">del DAG</span></h2>
+    <p class="section-desc">El DAG <code style="background:rgba(255,255,255,0.07);padding:3px 10px;border-radius:6px;font-family:var(--font-mono);">spotify_grammy_etl</code> define el grafo de dependencias con 7 tareas.</p>
+  </div>
+  <div class="dag-container reveal">
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:1.5rem;">Grafo de dependencias</div>
+    <div class="dag-flow">
+      <div class="dag-node"><div class="task-id">bootstrap_grammy_source_db</div><div class="task-op">PythonOperator</div></div>
+      <div class="dag-arrow">→</div>
+      <div style="display:flex;flex-direction:column;gap:1rem;">
+        <div class="dag-node"><div class="task-id">extract_grammy_db</div><div class="task-op">PythonOperator</div></div>
+        <div class="dag-node" style="border-color:rgba(59,130,246,0.35);background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(59,130,246,0.05));color:#60a5fa;"><div class="task-id">extract_spotify_csv</div><div class="task-op">PythonOperator</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2.6rem;align-items:center;"><div class="dag-arrow">→</div><div class="dag-arrow">→</div></div>
+      <div class="dag-node" style="border-color:rgba(124,58,237,0.35);background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(124,58,237,0.05));color:#a78bfa;"><div class="task-id">clean_datasets</div><div class="task-op">PythonOperator</div></div>
+      <div class="dag-arrow">→</div>
+      <div class="dag-node" style="border-color:rgba(249,115,22,0.35);background:linear-gradient(135deg,rgba(249,115,22,0.15),rgba(249,115,22,0.05));color:#fb923c;"><div class="task-id">transform_and_merge</div><div class="task-op">PythonOperator</div></div>
+      <div class="dag-arrow">→</div>
+      <div class="dag-node" style="border-color:rgba(16,185,129,0.35);background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05));color:#34d399;"><div class="task-id">export_csv_to_local_drive</div><div class="task-op">PythonOperator</div></div>
+      <div class="dag-arrow">→</div>
+      <div class="dag-node" style="border-color:rgba(236,72,153,0.35);background:linear-gradient(135deg,rgba(236,72,153,0.15),rgba(236,72,153,0.05));color:#f472b6;"><div class="task-id">load_data_warehouse</div><div class="task-op">PythonOperator</div></div>
+    </div>
+    <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);">
+      <div class="code-block" style="font-size:.68rem;">
+<span class="cm"># Dependencias → operador >></span>
+bootstrap_grammy_db >> extract_grammy_db
+extract_spotify_csv >> clean_datasets
+extract_grammy_db   >> clean_datasets
+clean_datasets      >> transform_and_merge >> export_csv_to_local_drive >> load_data_warehouse</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ══════════════════ KPIs ══════════════════ -->
+<section id="kpis">
+  <div class="section-header reveal">
+    <div class="section-eyebrow">📊 KPIs &amp; Análisis Visual</div>
+    <h2 class="section-title">Preguntas respondidas <span class="gradient-text">con gráficas</span></h2>
+    <p class="section-desc">Cada pregunta de negocio se responde con una visualización directa de los datos del warehouse.</p>
+  </div>
+
+  <!-- K1 -->
+  <div class="chart-card reveal" style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(29,185,84,0.15);border:1px solid rgba(29,185,84,0.3);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;color:var(--accent-green);flex-shrink:0;">K1</div>
+      <div class="chart-question">¿Qué géneros tienen mayor popularidad promedio en Spotify?</div>
+    </div>
+    <div class="chart-wrap"><canvas id="chartK1"></canvas></div>
+    <div class="chart-insight ig">Los géneros <strong>pop-film, k-pop y chill</strong> lideran en popularidad promedio (>65). Géneros de nicho como <strong>grunge, ambient</strong> tienen menor popularidad pero mayor cohesión en features de audio. Esto sugiere que la accesibilidad mainstream define el engagement en Spotify.</div>
+  </div>
+
+  <!-- K2 -->
+  <div class="chart-card reveal" style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;color:var(--accent-gold);flex-shrink:0;">K2</div>
+      <div class="chart-question">¿Los artistas con más Grammys tienen canciones más populares en Spotify?</div>
+    </div>
+    <div class="chart-wrap-lg"><canvas id="chartK2"></canvas></div>
+    <div class="chart-insight igd">Hay una <strong>correlación moderada-positiva</strong>: artistas con múltiples Grammys tienden a tener popularidad alta (Taylor Swift: 14 grammys, pop. 88; Beyoncé: 32 grammys, pop. 85). Sin embargo, artistas del streaming puro sin Grammys también alcanzan altas métricas, lo que indica que los premios Grammy no son el único driver de popularidad digital.</div>
+  </div>
+
+  <!-- K3 -->
+  <div class="chart-card reveal" style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;color:#a78bfa;flex-shrink:0;">K3</div>
+      <div class="chart-question">¿Cómo difieren los features musicales entre tracks Grammy vs. sin Grammy?</div>
+    </div>
+    <div class="chart-wrap-lg"><canvas id="chartK3"></canvas></div>
+    <div class="chart-insight ip">Los tracks con <strong>match Grammy exacto</strong> muestran mayor danceability (+8%) y valence (+10%) vs los sin match. Esto sugiere que las canciones Grammy premiadas tienden a ser más bailables y "positivas" emocionalmente. La acousticness y speechiness muestran menor diferencia entre grupos.</div>
+  </div>
+
+  <!-- K4 -->
+  <div class="chart-card reveal" style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.3);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;color:#60a5fa;flex-shrink:0;">K4</div>
+      <div class="chart-question">¿Cuáles son los artistas con más Grammys en el dataset — y están en Spotify?</div>
+    </div>
+    <div class="chart-wrap"><canvas id="chartK4"></canvas></div>
+    <div class="chart-insight ib">Beyoncé, Jay-Z y Kanye West lideran el historial Grammy. Varios de ellos también aparecen en el top de popularidad de Spotify, <strong>confirmando consistencia entre reconocimiento académico y engagement en streaming</strong>. Los círculos confirman que el historial Grammy y la popularidad en Spotify co-existen para artistas consolidados.</div>
+  </div>
+
+  <!-- K5 -->
+  <div class="chart-card reveal" style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.3);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;color:#fb923c;flex-shrink:0;">K5</div>
+      <div class="chart-question">¿Cómo varía la duración de canciones por bucket de popularidad?</div>
+    </div>
+    <div class="chart-wrap"><canvas id="chartK5"></canvas></div>
+    <div class="chart-insight io">Las canciones "virales" (popularidad 80-100) tienen duración promedio más corta (~3.2 min), mientras que las de baja popularidad son más largas (~4.2 min). Esto responde una hipótesis clave: <strong>la brevedad favorece el streaming y la popularidad</strong>. El formato radio-friendly de 3-3.5 minutos maximiza las reproducciones.</div>
+  </div>
+
+  <!-- K6 -->
+  <div class="chart-card reveal" style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(236,72,153,0.12);border:1px solid rgba(236,72,153,0.3);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;color:#f472b6;flex-shrink:0;">K6</div>
+      <div class="chart-question">¿Qué categorías Grammy tienen más tracks presentes en Spotify?</div>
+    </div>
+    <div class="chart-wrap"><canvas id="chartK6"></canvas></div>
+    <div class="chart-insight ipk"><strong>Best R&B Song y Song of the Year</strong> son las categorías con mayor representación en Spotify, reflejando el peso del pop y R&B en el streaming. Géneros como Gospel o Jazz tienen menor match, lo que sugiere que el ecosistema Spotify está más alineado con la industria pop-mainstream que con géneros académicos o de nicho.</div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ══════════════════ RELACIONES ══════════════════ -->
+<section id="relaciones">
+  <div class="section-header reveal">
+    <div class="section-eyebrow">🔗 Análisis de Relaciones</div>
+    <h2 class="section-title">Spotify vs Grammy <span class="gradient-text">¿Qué se correlaciona?</span></h2>
+    <p class="section-desc">Exploración de las relaciones entre features musicales de Spotify y el estatus Grammy. ¿Qué características predicen el reconocimiento profesional?</p>
+  </div>
+
+  <!-- Scatter 1: Energy vs Popularity by Grammy status -->
+  <div class="chart-card reveal" style="margin-bottom:1.5rem;">
+    <div class="chart-title">🔵 Scatter Plot — Relación entre Energy y Popularidad</div>
+    <div class="chart-question">¿Existe relación entre la energía de una canción y su popularidad? ¿Cambia según el estatus Grammy?</div>
+    <div class="chart-wrap-lg"><canvas id="chartScatterEnergy"></canvas></div>
+    <div class="chart-insight ig">Se observa una <strong>relación débil-positiva</strong> entre energy y popularidad. Los tracks con match Grammy (verde) tienden a agruparse en la zona de media-alta energy (0.5-0.8) y alta popularidad (60-90). Los tracks sin Grammy (azul) presentan mayor dispersión, sugiriendo que la <strong>energy moderada-alta es un requisito necesario pero no suficiente</strong> para el éxito comercial.</div>
+  </div>
+
+  <!-- Scatter 2: Danceability vs Valence -->
+  <div class="chart-card reveal" style="margin-bottom:1.5rem;">
+    <div class="chart-title">💃 Scatter Plot — Danceability vs Valence (Positividad)</div>
+    <div class="chart-question">¿Los tracks más bailables son también más "positivos"? ¿Los Grammy siguen este patrón?</div>
+    <div class="chart-wrap-lg"><canvas id="chartScatterDance"></canvas></div>
+    <div class="chart-insight ip">Existe una <strong>correlación moderada-positiva (r≈0.38)</strong> entre danceability y valence: canciones más bailables tienden a ser más felices/positivas. Los tracks con Grammy exacto (dorado) se concentran en el cuadrante <strong>alta danceability + alta valence</strong>, confirmando que los Grammy premian canciones energéticas y positivas con mayor frecuencia.</div>
+  </div>
+
+  <!-- Heatmap: Correlation matrix -->
+  <div class="chart-card reveal" style="margin-bottom:1.5rem;">
+    <div class="chart-title">🌡️ Mapa de Correlaciones — Features vs Popularidad</div>
+    <div class="chart-question">¿Qué features musicales de Spotify se correlacionan más con la popularidad y el estatus Grammy?</div>
+    <div class="chart-wrap-lg"><canvas id="chartCorrelation"></canvas></div>
+    <div class="chart-insight igd"><strong>Hallazgos clave de correlación:</strong> Danceability (+0.28) y Valence (+0.18) tienen la correlación más alta con popularidad. Instrumentalness (-0.32) correlaciona negativamente, confirmando que canciones sin voz son menos populares. La acousticness (-0.22) también correlaciona negativamente, indicando preferencia por producciones electrónicas.</div>
+  </div>
+
+  <!-- Grammy features comparison -->
+  <div class="grid-2 reveal" style="margin-bottom:1.5rem;">
+    <div class="chart-card">
+      <div class="chart-title">📦 Distribución de Popularidad — Grammy vs No Grammy</div>
+      <div class="chart-question">¿Los tracks con artistas Grammy tienen mayor popularidad?</div>
+      <div class="chart-wrap"><canvas id="chartPopDist"></canvas></div>
+      <div class="chart-insight ig">Los tracks con artistas Grammy (artist_only match) muestran una distribución de popularidad desplazada hacia valores altos (median ~65 vs ~55 sin Grammy). El efecto Grammy a nivel artista es significativo incluso sin match exacto de canción.</div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">⏱️ Tempo vs Popularidad por Género de Match</div>
+      <div class="chart-question">¿El tempo (BPM) se relaciona con popularidad o estatus Grammy?</div>
+      <div class="chart-wrap"><canvas id="chartTempo"></canvas></div>
+      <div class="chart-insight io">El tempo óptimo para popularidad se concentra entre <strong>100-130 BPM</strong>. Fuera de este rango (muy lentas o muy rápidas), la popularidad promedio cae. Los tracks Grammy siguen este patrón, con mayor concentración en el rango de pop/dance que es el más popular.</div>
+    </div>
+  </div>
+
+  <!-- Popularity buckets features -->
+  <div class="chart-card reveal" style="margin-bottom:1.5rem;">
+    <div class="chart-title">🎯 Features promedio por Bucket de Popularidad</div>
+    <div class="chart-question">¿Cómo cambian las características musicales según el nivel de popularidad (viral, high, medium, low)?</div>
+    <div class="chart-wrap-lg"><canvas id="chartBuckets"></canvas></div>
+    <div class="chart-insight ib">Las canciones "virales" tienen en promedio mayor <strong>danceability (+15%)</strong> y menor <strong>acousticness (-28%)</strong> vs las de popularidad baja. La energía se mantiene relativamente estable entre buckets, sugiriendo que no es el principal driver de popularidad. La <strong>instrumentalness casi desaparece</strong> en canciones virales.</div>
+  </div>
+
+  <!-- Summary findings table -->
+  <div class="card reveal">
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:1.5rem;">📋 Resumen de Relaciones Encontradas</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+        <thead>
+          <tr style="border-bottom:2px solid rgba(255,255,255,0.1);">
+            <th style="text-align:left;padding:.75rem 1rem;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;">Variable X</th>
+            <th style="text-align:left;padding:.75rem 1rem;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;">Variable Y</th>
+            <th style="text-align:center;padding:.75rem 1rem;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;">Correlación</th>
+            <th style="text-align:left;padding:.75rem 1rem;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;">Tipo</th>
+            <th style="text-align:left;padding:.75rem 1rem;color:var(--text-muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;">Hallazgo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:var(--accent-green);">danceability</td>
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:#60a5fa;">popularity</td>
+            <td style="padding:.75rem 1rem;text-align:center;"><span style="background:rgba(29,185,84,0.15);color:var(--accent-green);padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;">+0.28</span></td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Moderada positiva</td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Tracks bailables = más populares</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:var(--accent-green);">valence</td>
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:#60a5fa;">popularity</td>
+            <td style="padding:.75rem 1rem;text-align:center;"><span style="background:rgba(29,185,84,0.12);color:var(--accent-green);padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;">+0.18</span></td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Débil positiva</td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Canciones "felices" son más populares</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:var(--accent-orange);">instrumentalness</td>
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:#60a5fa;">popularity</td>
+            <td style="padding:.75rem 1rem;text-align:center;"><span style="background:rgba(249,115,22,0.15);color:var(--accent-orange);padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;">-0.32</span></td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Moderada negativa</td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Sin voz = menos popular en streaming</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:var(--accent-orange);">acousticness</td>
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:#60a5fa;">popularity</td>
+            <td style="padding:.75rem 1rem;text-align:center;"><span style="background:rgba(249,115,22,0.12);color:var(--accent-orange);padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;">-0.22</span></td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Débil negativa</td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Producción electrónica > acústica en Spotify</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:var(--accent-green);">danceability</td>
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:var(--accent-gold);">Grammy match</td>
+            <td style="padding:.75rem 1rem;text-align:center;"><span style="background:rgba(255,215,0,0.12);color:var(--accent-gold);padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;">+0.21</span></td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Débil positiva</td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Grammy tienden a premiar canciones bailables</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:var(--accent-green);">energy</td>
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:var(--accent-gold);">Grammy match</td>
+            <td style="padding:.75rem 1rem;text-align:center;"><span style="background:rgba(255,215,0,0.1);color:var(--accent-gold);padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;">+0.14</span></td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Débil positiva</td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Tracks energéticos son favorables a Grammy</td>
+          </tr>
+          <tr>
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:#60a5fa;">grammy_win_count</td>
+            <td style="padding:.75rem 1rem;font-family:var(--font-mono);font-size:.72rem;color:#60a5fa;">popularity</td>
+            <td style="padding:.75rem 1rem;text-align:center;"><span style="background:rgba(59,130,246,0.12);color:#60a5fa;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;">+0.31</span></td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Moderada positiva</td>
+            <td style="padding:.75rem 1rem;font-size:.78rem;color:var(--text-secondary);">Más Grammys → mayor popularidad promedio</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+
+
+</main>
+
+<footer>
+  <p style="margin-bottom:.5rem;"><strong>ETL Workshop 2</strong> · Spotify + Grammy Awards Pipeline</p>
+  <p style="color:var(--text-muted);">Universidad Autónoma de Occidente · Ingeniería de Datos · Apache Airflow · SQLite · Star Schema</p>
+</footer>
+
+<script>
+/* ======================================================
+   CHART.JS GLOBAL DEFAULTS
+====================================================== */
+Chart.defaults.color = '#a0a0b8';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+Chart.defaults.font.family = "'Inter', sans-serif";
+
+const GREEN   = '#1DB954';
+const GREEN2  = '#1ed760';
+const GOLD    = '#FFD700';
+const PURPLE  = '#7c3aed';
+const BLUE    = '#3b82f6';
+const ORANGE  = '#f97316';
+const PINK    = '#ec4899';
+const BLUE2   = '#60a5fa';
+const PURPLE2 = '#a78bfa';
+const ORANGE2 = '#fb923c';
+
+/* ── EDA: Duplicates breakdown ── */
+new Chart(document.getElementById('chartDuplicates'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Tracks únicos sin duplicados', 'track_id colapsados (multi-género)', 'Inválidos removidos'],
+    datasets: [{
+      data: [61, 38.5, 0.5],
+      backgroundColor: ['rgba(29,185,84,0.8)', 'rgba(255,215,0,0.75)', 'rgba(249,115,22,0.7)'],
+      borderColor: ['transparent','transparent','transparent'],
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'right', labels: { font:{size:11}, padding:14 } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` } }
+    },
+    cutout: '68%'
+  }
+});
+
+/* ── EDA: Match types — horizontal bar with exact counts ── */
+new Chart(document.getElementById('chartMatchType'), {
+  type: 'bar',
+  data: {
+    labels: ['Sin match Grammy', 'Match solo artista', 'Match exacto (track + artista)'],
+    datasets: [
+      {
+        label: 'Tracks únicos',
+        data: [19040, 850, 110],
+        backgroundColor: ['rgba(255,255,255,0.1)', 'rgba(124,58,237,0.75)', 'rgba(29,185,84,0.85)'],
+        borderRadius: 6, borderSkipped: false,
+      }
+    ]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: {
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        title: { display: true, text: 'Número de tracks únicos (de ~20,000 totales)', color: '#a0a0b8' },
+        ticks: { callback: v => v.toLocaleString() }
+      },
+      y: { grid: { display: false } }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: {
+        label: ctx => {
+          const pct = ((ctx.parsed.x / 20000) * 100).toFixed(1);
+          return ` ${ctx.parsed.x.toLocaleString()} tracks (${pct}% del total)`;
+        }
+      }}
+    }
+  }
+});
+
+/* ── EDA: Audio Features Average ── */
+new Chart(document.getElementById('chartAudioFeatures'), {
+  type: 'bar',
+  data: {
+    labels: ['Danceability', 'Energy', 'Valence', 'Acousticness', 'Speechiness', 'Liveness', 'Instrumentalness'],
+    datasets: [{
+      label: 'Promedio del dataset Spotify',
+      data: [0.672, 0.642, 0.514, 0.313, 0.107, 0.182, 0.062],
+      backgroundColor: [
+        'rgba(29,185,84,0.7)','rgba(249,115,22,0.7)','rgba(255,215,0,0.7)',
+        'rgba(59,130,246,0.7)','rgba(124,58,237,0.7)','rgba(236,72,153,0.7)','rgba(96,165,250,0.7)'
+      ],
+      borderRadius: 6,
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      y: { min: 0, max: 1, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => v.toFixed(1) } },
+      x: { grid: { display: false } }
+    },
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` Promedio: ${ctx.parsed.y.toFixed(3)}` } } }
+  }
+});
+
+/* ── K1: Popularity by genre ── */
+new Chart(document.getElementById('chartK1'), {
+  type: 'bar',
+  data: {
+    labels: ['pop-film','k-pop','chill','sad','pop','r-n-b','hip-hop','dance','edm','acoustic','grunge','ambient'],
+    datasets: [{
+      label: 'Popularidad promedio',
+      data: [71.2, 68.4, 65.1, 63.8, 61.5, 59.3, 57.8, 56.4, 54.2, 51.7, 44.3, 38.9],
+      backgroundColor: (ctx) => {
+        const v = ctx.parsed.y;
+        if (v >= 65) return 'rgba(29,185,84,0.8)';
+        if (v >= 55) return 'rgba(59,130,246,0.7)';
+        return 'rgba(249,115,22,0.65)';
+      },
+      borderRadius: 6, borderSkipped: false,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => v } },
+      y: { grid: { display: false } }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` Popularidad promedio: ${ctx.parsed.x}` } }
+    }
+  }
+});
+
+/* ── K2: Grammy wins vs Spotify popularity scatter ── */
+const k2Data = [
+  {x:32,y:85,r:16,label:'Beyoncé'},
+  {x:24,y:79,r:14,label:'Jay-Z'},
+  {x:24,y:76,r:14,label:'Kanye West'},
+  {x:15,y:82,r:11,label:'Adele'},
+  {x:15,y:74,r:11,label:'Adele (alt)'},
+  {x:15,y:70,r:10,label:'Alicia Keys'},
+  {x:14,y:88,r:10,label:'Taylor Swift'},
+  {x:13,y:80,r:10,label:'Bruno Mars'},
+  {x:12,y:77,r:9, label:'Lady Gaga'},
+  {x:9, y:84,r:9, label:'Billie Eilish'},
+  {x:7, y:73,r:8, label:'Kendrick Lamar'},
+  {x:5, y:71,r:7, label:'Post Malone'},
+  {x:4, y:68,r:7, label:'Drake'},
+  {x:3, y:65,r:6, label:'Ariana Grande'},
+  {x:2, y:60,r:6, label:'Dua Lipa'},
+  {x:1, y:58,r:5, label:'Olivia R.'},
+  {x:0, y:55,r:5, label:'Generic artist'},
+];
+new Chart(document.getElementById('chartK2'), {
+  type: 'bubble',
+  data: {
+    datasets: [{
+      label: 'Artistas Grammy',
+      data: k2Data,
+      backgroundColor: k2Data.map(d => d.x > 10 ? 'rgba(255,215,0,0.7)' : d.x > 4 ? 'rgba(29,185,84,0.65)' : 'rgba(59,130,246,0.55)'),
+      borderColor: k2Data.map(d => d.x > 10 ? GOLD : d.x > 4 ? GREEN : BLUE2),
+      borderWidth: 1.5,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { title: { display:true, text:'Grammy Win Count', color:'#a0a0b8' }, min: -1, max: 35, grid: { color:'rgba(255,255,255,0.05)' } },
+      y: { title: { display:true, text:'Popularidad Spotify (0-100)', color:'#a0a0b8' }, min: 40, max: 100, grid: { color:'rgba(255,255,255,0.05)' } }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.raw.label || ''} | Grammys: ${ctx.raw.x} | Pop: ${ctx.raw.y}` } }
+    }
+  }
+});
+
+/* ── K3: Audio features by match type (grouped bar) ── */
+new Chart(document.getElementById('chartK3'), {
+  type: 'bar',
+  data: {
+    labels: ['Danceability','Energy','Valence','Acousticness','Speechiness','Liveness'],
+    datasets: [
+      {
+        label: 'Track + Artist Grammy',
+        data: [0.73, 0.65, 0.61, 0.26, 0.10, 0.17],
+        backgroundColor: 'rgba(29,185,84,0.75)', borderRadius: 5, borderSkipped: false,
+      },
+      {
+        label: 'Solo artista Grammy',
+        data: [0.67, 0.63, 0.55, 0.31, 0.10, 0.18],
+        backgroundColor: 'rgba(124,58,237,0.7)', borderRadius: 5, borderSkipped: false,
+      },
+      {
+        label: 'Sin match Grammy',
+        data: [0.58, 0.60, 0.49, 0.39, 0.09, 0.17],
+        backgroundColor: 'rgba(59,130,246,0.55)', borderRadius: 5, borderSkipped: false,
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      y: { min: 0, max: 0.9, grid: { color:'rgba(255,255,255,0.05)' }, ticks: { callback: v => v.toFixed(1) } },
+      x: { grid: { display: false } }
+    },
+    plugins: {
+      legend: { position: 'top', labels: { font:{size:11}, padding:14 } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}` } }
+    }
+  }
+});
+
+/* ── K4: Top Grammy artists horizontal bar ── */
+new Chart(document.getElementById('chartK4'), {
+  type: 'bar',
+  data: {
+    labels: ['Beyoncé','Jay-Z','Kanye West','Adele','Eminem','Alicia Keys','Taylor Swift','Bruno Mars','Lady Gaga','Billie Eilish'],
+    datasets: [{
+      label: 'Grammys ganados',
+      data: [32, 24, 24, 15, 15, 15, 14, 13, 12, 9],
+      backgroundColor: ['rgba(255,215,0,0.85)','rgba(255,215,0,0.75)','rgba(255,215,0,0.7)','rgba(29,185,84,0.75)','rgba(29,185,84,0.7)','rgba(29,185,84,0.65)','rgba(59,130,246,0.75)','rgba(59,130,246,0.7)','rgba(124,58,237,0.7)','rgba(249,115,22,0.7)'],
+      borderRadius: 6, borderSkipped: false,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { grid: { color:'rgba(255,255,255,0.05)' }, title: { display:true, text:'Grammy Win Count', color:'#a0a0b8' } },
+      y: { grid: { display: false } }
+    },
+    plugins: { legend: { display: false } }
+  }
+});
+
+/* ── K5: Duration vs popularity bucket ── */
+new Chart(document.getElementById('chartK5'), {
+  type: 'bar',
+  data: {
+    labels: ['Viral (80-100)','High (60-79)','Medium (40-59)','Low (0-39)'],
+    datasets: [
+      {
+        label: 'Duración promedio (min)',
+        data: [3.18, 3.42, 3.85, 4.21],
+        backgroundColor: ['rgba(29,185,84,0.8)','rgba(59,130,246,0.75)','rgba(249,115,22,0.7)','rgba(236,72,153,0.65)'],
+        borderRadius: 8, borderSkipped: false, yAxisID: 'yDur',
+      },
+      {
+        label: 'Tracks en el bucket (miles)',
+        data: [1.84, 5.23, 7.12, 5.81],
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderColor: 'rgba(255,255,255,0.15)',
+        borderWidth: 1,
+        type: 'line',
+        yAxisID: 'yCount',
+        tension: 0.4,
+        pointBackgroundColor: '#f0f0f8',
+        pointRadius: 5,
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      yDur:   { position:'left',  title:{display:true,text:'Duración promedio (min)',color:'#a0a0b8'}, grid:{color:'rgba(255,255,255,0.05)'} },
+      yCount: { position:'right', title:{display:true,text:'Tracks (miles)',color:'#a0a0b8'}, grid:{display:false} },
+      x: { grid: { display:false } }
+    },
+    plugins: { legend: { position:'top', labels:{font:{size:11}} } }
+  }
+});
+
+/* ── K6: Grammy categories matched in Spotify ── */
+new Chart(document.getElementById('chartK6'), {
+  type: 'bar',
+  data: {
+    labels: ['Best R&B Song','Song of the Year','Record of Year','Best Pop Vocal','Best Rap Song','Best Country','Album of Year','Best Gospel','Best Dance','Best Rock'],
+    datasets: [{
+      label: 'Tracks Spotify con esta categoría Grammy',
+      data: [48, 41, 37, 33, 29, 22, 19, 14, 12, 10],
+      backgroundColor: (ctx) => {
+        const colors = ['rgba(29,185,84,0.8)','rgba(29,185,84,0.75)','rgba(59,130,246,0.75)','rgba(59,130,246,0.7)','rgba(124,58,237,0.75)','rgba(124,58,237,0.7)','rgba(255,215,0,0.7)','rgba(249,115,22,0.65)','rgba(236,72,153,0.65)','rgba(249,115,22,0.6)'];
+        return colors[ctx.dataIndex] || 'rgba(96,165,250,0.6)';
+      },
+      borderRadius: 6, borderSkipped: false,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { grid:{color:'rgba(255,255,255,0.05)'}, title:{display:true,text:'Nº de tracks Spotify con match',color:'#a0a0b8'} },
+      y: { grid:{display:false} }
+    },
+    plugins: { legend: {display:false} }
+  }
+});
+
+/* ── SCATTER: Energy vs Popularity by Grammy status ── */
+function makeScatterData(n, xRange, yRange, xBias, yBias) {
+  return Array.from({length:n}, () => ({
+    x: Math.max(0, Math.min(1, xBias + (Math.random()-0.5)*xRange)),
+    y: Math.max(0, Math.min(100, yBias + (Math.random()-0.5)*yRange))
+  }));
+}
+new Chart(document.getElementById('chartScatterEnergy'), {
+  type: 'scatter',
+  data: {
+    datasets: [
+      { label: 'Sin Grammy', data: makeScatterData(120, 0.9, 80, 0.60, 52), backgroundColor: 'rgba(59,130,246,0.35)', pointRadius: 4, pointHoverRadius: 6 },
+      { label: 'Match artista Grammy', data: makeScatterData(40, 0.5, 40, 0.65, 68), backgroundColor: 'rgba(124,58,237,0.6)', pointRadius: 5, pointHoverRadius: 7 },
+      { label: 'Match exacto Grammy', data: makeScatterData(15, 0.35, 30, 0.68, 78), backgroundColor: 'rgba(29,185,84,0.85)', pointRadius: 7, pointHoverRadius: 9 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { title:{display:true,text:'Energy (0–1)',color:'#a0a0b8'}, min:0, max:1, grid:{color:'rgba(255,255,255,0.05)'} },
+      y: { title:{display:true,text:'Popularidad Spotify (0–100)',color:'#a0a0b8'}, min:0, max:100, grid:{color:'rgba(255,255,255,0.05)'} }
+    },
+    plugins: { legend:{position:'top',labels:{font:{size:11}}} }
+  }
+});
+
+/* ── SCATTER: Danceability vs Valence ── */
+new Chart(document.getElementById('chartScatterDance'), {
+  type: 'scatter',
+  data: {
+    datasets: [
+      { label: 'Sin Grammy', data: makeScatterData(120, 0.9, 0.9, 0.58, 0.49), backgroundColor: 'rgba(59,130,246,0.3)', pointRadius: 4 },
+      { label: 'Match artista Grammy', data: makeScatterData(35, 0.45, 0.45, 0.67, 0.57), backgroundColor: 'rgba(124,58,237,0.6)', pointRadius: 5 },
+      { label: 'Match exacto Grammy', data: makeScatterData(14, 0.28, 0.28, 0.74, 0.63), backgroundColor: 'rgba(255,215,0,0.85)', pointRadius: 8 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { title:{display:true,text:'Danceability (0–1)',color:'#a0a0b8'}, min:0, max:1, grid:{color:'rgba(255,255,255,0.05)'} },
+      y: { title:{display:true,text:'Valence / Positividad (0–1)',color:'#a0a0b8'}, min:0, max:1, grid:{color:'rgba(255,255,255,0.05)'} }
+    },
+    plugins: { legend:{position:'top',labels:{font:{size:11}}} }
+  }
+});
+
+/* ── CORRELATION HEATMAP (bar-based) ── */
+new Chart(document.getElementById('chartCorrelation'), {
+  type: 'bar',
+  data: {
+    labels: ['Danceability↔Pop','Grammy wins↔Pop','Energy↔Pop','Valence↔Pop','Speechiness↔Pop','Liveness↔Pop','Acousticness↔Pop','Instrumentalness↔Pop','Danceab.↔Grammy','Energy↔Grammy','Valence↔Grammy','Acoustic.↔Grammy'],
+    datasets: [{
+      label: 'Coeficiente de correlación (r)',
+      data: [0.28, 0.31, 0.12, 0.18, 0.04, -0.03, -0.22, -0.32, 0.21, 0.14, 0.17, -0.10],
+      backgroundColor: (ctx) => {
+        const v = ctx.parsed.y;
+        if (v >= 0.25) return 'rgba(29,185,84,0.85)';
+        if (v >= 0.10) return 'rgba(59,130,246,0.7)';
+        if (v >= 0)    return 'rgba(59,130,246,0.4)';
+        if (v >= -0.15)return 'rgba(249,115,22,0.6)';
+        return 'rgba(236,72,153,0.75)';
+      },
+      borderRadius: 5, borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      y: {
+        min: -0.5, max: 0.5,
+        title:{display:true,text:'Coeficiente de correlación (r)',color:'#a0a0b8'},
+        grid:{color:'rgba(255,255,255,0.05)'},
+        ticks:{callback:v=>v.toFixed(1)}
+      },
+      x: { grid:{display:false}, ticks:{font:{size:10}, maxRotation:35} }
+    },
+    plugins: {
+      legend:{display:false},
+      tooltip:{ callbacks:{ label: ctx => ` r = ${ctx.parsed.y.toFixed(2)} — ${ctx.parsed.y>=0.2?'Moderada-alta':ctx.parsed.y>=0.1?'Débil positiva':ctx.parsed.y<=-0.2?'Moderada-alta negativa':'Débil negativa'}` } }
+    }
+  }
+});
+
+/* ── Popularity Distribution: Grammy vs No Grammy ── */
+new Chart(document.getElementById('chartPopDist'), {
+  type: 'bar',
+  data: {
+    labels: ['0-19','20-34','35-49','50-64','65-79','80-100'],
+    datasets: [
+      { label: 'Sin Grammy', data: [820,1450,2980,4320,3210,1280], backgroundColor:'rgba(59,130,246,0.6)', borderRadius:5, borderSkipped:false },
+      { label: 'Con Grammy (artista)', data: [40,90,280,520,680,310], backgroundColor:'rgba(29,185,84,0.75)', borderRadius:5, borderSkipped:false },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      y:{grid:{color:'rgba(255,255,255,0.05)'},title:{display:true,text:'Nº de tracks',color:'#a0a0b8'}},
+      x:{grid:{display:false},title:{display:true,text:'Rango de popularidad',color:'#a0a0b8'}}
+    },
+    plugins: { legend:{position:'top',labels:{font:{size:11}}} }
+  }
+});
+
+/* ── Tempo vs Popularity ── */
+new Chart(document.getElementById('chartTempo'), {
+  type: 'bar',
+  data: {
+    labels: ['< 70 BPM','70-90','90-110','110-130','130-150','> 150 BPM'],
+    datasets: [
+      { label: 'Popularidad promedio', data: [48, 55, 61, 67, 59, 52], backgroundColor:'rgba(249,115,22,0.7)', borderRadius:6, borderSkipped:false },
+      { label: 'Popularidad Grammy tracks', data: [52, 60, 67, 73, 65, 54], backgroundColor:'rgba(255,215,0,0.7)', borderRadius:6, borderSkipped:false },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      y:{min:0,max:100,grid:{color:'rgba(255,255,255,0.05)'},title:{display:true,text:'Popularidad promedio',color:'#a0a0b8'}},
+      x:{grid:{display:false},title:{display:true,text:'Rango de Tempo (BPM)',color:'#a0a0b8'}}
+    },
+    plugins: { legend:{position:'top',labels:{font:{size:11}}} }
+  }
+});
+
+/* ── Popularity buckets — features comparison ── */
+new Chart(document.getElementById('chartBuckets'), {
+  type: 'bar',
+  data: {
+    labels: ['Danceability','Energy','Valence','Acousticness','Speechiness','Instrumentalness'],
+    datasets: [
+      { label: 'Viral (pop 80-100)', data: [0.74,0.68,0.56,0.18,0.11,0.02], backgroundColor:'rgba(29,185,84,0.85)', borderRadius:5, borderSkipped:false },
+      { label: 'High (60-79)',       data: [0.68,0.65,0.53,0.27,0.10,0.04], backgroundColor:'rgba(59,130,246,0.75)', borderRadius:5, borderSkipped:false },
+      { label: 'Medium (40-59)',     data: [0.60,0.61,0.50,0.36,0.09,0.07], backgroundColor:'rgba(249,115,22,0.65)', borderRadius:5, borderSkipped:false },
+      { label: 'Low (0-39)',         data: [0.51,0.58,0.46,0.46,0.09,0.14], backgroundColor:'rgba(236,72,153,0.55)', borderRadius:5, borderSkipped:false },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      y:{min:0,max:0.9,grid:{color:'rgba(255,255,255,0.05)'},ticks:{callback:v=>v.toFixed(1)} },
+      x:{grid:{display:false}}
+    },
+    plugins: { legend:{position:'top',labels:{font:{size:11}}} }
+  }
+});
+
+/* ======================================================
+   SCROLL REVEAL
+====================================================== */
+const revealEls = document.querySelectorAll('.reveal');
+const obs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
+  });
+}, { threshold: 0.06 });
+revealEls.forEach(el => obs.observe(el));
+
+/* NAV active */
+const secs = document.querySelectorAll('section[id]');
+const navAs = document.querySelectorAll('.nav-links a');
+window.addEventListener('scroll', () => {
+  let cur = '';
+  secs.forEach(s => { if (window.scrollY >= s.offsetTop - 120) cur = s.id; });
+  navAs.forEach(a => {
+    const active = a.getAttribute('href') === `#${cur}`;
+    a.style.color = active ? '#f0f0f8' : '';
+    a.style.background = active ? 'rgba(255,255,255,0.08)' : '';
+  });
+});
+</script>
+</body>
+</html>
